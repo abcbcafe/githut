@@ -33,6 +33,9 @@ accumulation, GGX PBR; load a glTF test mesh + materials.
   boundary, and Beer–Lambert tint (`bsdf::{fresnel_dielectric,refract,ggx_sample_normal_local}`,
   `dielectric_bounce`). Verified by Snell/Fresnel/TIR unit tests, integrator transmittance tests,
   and a white-furnace energy-conservation bound (`--glass`).
+- [x] **Chromatic dispersion**: per-channel IOR via Cauchy's equation with hero-wavelength
+  sampling (pick one RGB channel, weight x3, trace that wavelength). Verified by Cauchy ordering,
+  blue-bends-more, chromatic-separation, and a dispersive white-furnace energy bound (`--dispersion`).
 - [x] Reference renderer is **multithreaded** (atomic-dispatched scanlines; ~4x on 4 cores) and
   bit-for-bit deterministic, since each pixel's RNG is seeded from (seed, pixel index).
 - [ ] GPU: BLAS/TLAS + RT pipeline; primary-hit albedo; NEE shadows; temporal accumulation; GGX BSDF.

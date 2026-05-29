@@ -80,6 +80,7 @@ cmake -S native/tools -B native/build-tools && cmake --build native/build-tools 
 ./native/build-tools/cpu_reference out.ppm --pt --fog  # + homogeneous "air" volumetrics
 ./native/build-tools/cpu_reference out.ppm --pt --nee  # + next-event estimation (MIS)
 ./native/build-tools/cpu_reference out.ppm --pt --glass # central block becomes glass
+./native/build-tools/cpu_reference out.ppm --pt --dispersion # prism: wavelength-split glass
 ./native/build-tools/cpu_reference out.ppm scene.vox   # or a MagicaVoxel model
 # (--spp=N overrides samples per pixel; flags combine, e.g. --pt --nee --glass)
 ```
@@ -88,13 +89,18 @@ It is BVH-accelerated and **multithreaded** (deterministic — pixels are indepe
 supports direct sun + hard shadows, a Monte Carlo **path integrator** (cosine-importance-sampled
 diffuse GI, **GGX** specular, **next-event estimation + MIS**), homogeneous **volumetric "air"**
 (Beer–Lambert distance fog / aerial perspective), and **dielectric glass** — smooth and rough
-(frosted) — with Snell refraction, Fresnel, total internal reflection, and Beer–Lambert tint. The
-GI is verified by white-furnace energy-conservation tests, the fog and glass by Beer–Lambert
-transmittance tests, and refraction by Snell/Fresnel/TIR unit tests.
+(frosted), with Snell refraction, Fresnel, total internal reflection, Beer–Lambert tint, and
+**chromatic dispersion** (Cauchy IOR via hero-wavelength sampling). The GI is verified by
+white-furnace energy-conservation tests, the fog and glass by Beer–Lambert transmittance tests,
+and refraction/dispersion by Snell/Fresnel/TIR and Cauchy/chromatic-separation unit tests.
 
-| Direct lighting | Path-traced GI | Volumetric air | Glass (refraction) |
-|---|---|---|---|
-| ![direct](docs/images/cpu_reference_demo.png) | ![gi](docs/images/cpu_reference_pt.png) | ![fog](docs/images/cpu_reference_fog.png) | ![glass](docs/images/cpu_reference_glass.png) |
+| Direct lighting | Path-traced GI | Volumetric air |
+|---|---|---|
+| ![direct](docs/images/cpu_reference_demo.png) | ![gi](docs/images/cpu_reference_pt.png) | ![fog](docs/images/cpu_reference_fog.png) |
+
+| Glass (refraction) | Chromatic dispersion |
+|---|---|
+| ![glass](docs/images/cpu_reference_glass.png) | ![dispersion](docs/images/cpu_reference_dispersion.png) |
 
 The full native GDExtension (godot-cpp + Vulkan + RTX) is built separately on a Vulkan-capable
 workstation; see [`docs/BUILD.md`](./docs/BUILD.md). CI gates the CPU-core tests

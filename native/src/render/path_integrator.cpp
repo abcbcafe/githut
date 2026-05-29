@@ -1,7 +1,10 @@
 #include "render/path_integrator.h"
 
 #include <algorithm>
+#include <atomic>
 #include <cmath>
+#include <thread>
+#include <vector>
 
 #include "render/bsdf.h"
 
@@ -292,40 +295,66 @@ std::vector<Vec3> path_render(const TriangleScene &scene, const PinholeCamera &c
                               uint64_t seed) {
     std::vector<Vec3> fb(static_cast<std::size_t>(settings.width) * settings.height);
 
-    for (int y = 0; y < settings.height; ++y) {
-        for (int x = 0; x < settings.width; ++x) {
-            const std::size_t pixel = static_cast<std::size_t>(y) * settings.width + x;
-            // Per-pixel stream keyed by seed + pixel index => deterministic.
-            Pcg32 rng(seed, pixel * 2u + 1u);
-
-            Vec3 sum{0.0f, 0.0f, 0.0f};
-            for (int s = 0; s < settings.spp; ++s) {
-                const float jx = rng.next_float();
-                const float jy = rng.next_float();
-                const float sx = (static_cast<float>(x) + jx) / static_cast<float>(settings.width);
-                const float sy =
-                        1.0f - (static_cast<float>(y) + jy) / static_cast<float>(settings.height);
-                const Ray ray = camera.generate_ray(sx, sy);
-
-                float primary_t = -1.0f;
-                Vec3 L = settings.next_event_estimation
-                                 ? trace_path_nee(scene, palette, ray, rng, settings.max_depth,
-                                                  settings.env_radiance, &primary_t)
-                                 : trace_path(scene, palette, ray, rng, settings.max_depth,
-                                              settings.env_radiance, &primary_t);
-
-                // Distance fog / aerial perspective on the primary segment.
-                if (settings.medium_enabled && primary_t > 0.0f) {
-                    const Vec3 tr = transmittance(settings.medium, primary_t);
-                    L = Vec3{L.x * tr.x + settings.fog_inscatter.x * (1.0f - tr.x),
-                             L.y * tr.y + settings.fog_inscatter.y * (1.0f - tr.y),
-                             L.z * tr.z + settings.fog_inscatter.z * (1.0f - tr.z)};
-                }
-                sum = sum + L;
+    // Each pixel's RNG is keyed only by (seed, pixel index), so rendering rows in
+    // parallel is bit-for-bit identical to the serial result. Rows are handed out
+    // dynamically via an atomic counter so heavy regions (e.g. frosted glass with
+    // many internal bounces) don't stall one thread while others idle.
+    std::atomic<int> next_row{0};
+    auto worker = [&]() {
+        for (;;) {
+            const int y = next_row.fetch_add(1, std::memory_order_relaxed);
+            if (y >= settings.height) {
+                break;
             }
-            const float inv = 1.0f / static_cast<float>(settings.spp);
-            fb[pixel] = sum * inv;
+            for (int x = 0; x < settings.width; ++x) {
+                const std::size_t pixel = static_cast<std::size_t>(y) * settings.width + x;
+                Pcg32 rng(seed, pixel * 2u + 1u);
+
+                Vec3 sum{0.0f, 0.0f, 0.0f};
+                for (int s = 0; s < settings.spp; ++s) {
+                    const float jx = rng.next_float();
+                    const float jy = rng.next_float();
+                    const float sx =
+                            (static_cast<float>(x) + jx) / static_cast<float>(settings.width);
+                    const float sy = 1.0f - (static_cast<float>(y) + jy) /
+                                                    static_cast<float>(settings.height);
+                    const Ray ray = camera.generate_ray(sx, sy);
+
+                    float primary_t = -1.0f;
+                    Vec3 L = settings.next_event_estimation
+                                     ? trace_path_nee(scene, palette, ray, rng, settings.max_depth,
+                                                      settings.env_radiance, &primary_t)
+                                     : trace_path(scene, palette, ray, rng, settings.max_depth,
+                                                  settings.env_radiance, &primary_t);
+
+                    // Distance fog / aerial perspective on the primary segment.
+                    if (settings.medium_enabled && primary_t > 0.0f) {
+                        const Vec3 tr = transmittance(settings.medium, primary_t);
+                        L = Vec3{L.x * tr.x + settings.fog_inscatter.x * (1.0f - tr.x),
+                                 L.y * tr.y + settings.fog_inscatter.y * (1.0f - tr.y),
+                                 L.z * tr.z + settings.fog_inscatter.z * (1.0f - tr.z)};
+                    }
+                    sum = sum + L;
+                }
+                fb[pixel] = sum * (1.0f / static_cast<float>(settings.spp));
+            }
         }
+    };
+
+    const unsigned hw = std::max(1u, std::thread::hardware_concurrency());
+    const unsigned n_threads = std::min<unsigned>(hw, std::max(1, settings.height));
+    if (n_threads <= 1) {
+        worker();
+        return fb;
+    }
+
+    std::vector<std::thread> pool;
+    pool.reserve(n_threads);
+    for (unsigned t = 0; t < n_threads; ++t) {
+        pool.emplace_back(worker);
+    }
+    for (std::thread &th : pool) {
+        th.join();
     }
     return fb;
 }

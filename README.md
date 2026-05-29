@@ -84,12 +84,13 @@ cmake -S native/tools -B native/build-tools && cmake --build native/build-tools 
 # (--spp=N overrides samples per pixel; flags combine, e.g. --pt --nee --glass)
 ```
 
-It is BVH-accelerated and supports direct sun + hard shadows, a Monte Carlo **path integrator**
-(cosine-importance-sampled diffuse GI, **GGX** specular, **next-event estimation + MIS**),
-homogeneous **volumetric "air"** (Beer–Lambert distance fog / aerial perspective), and smooth
-**dielectric glass** (Snell refraction, Fresnel, total internal reflection, tinted via
-Beer–Lambert). The GI is verified by white-furnace energy-conservation tests, the fog and glass by
-Beer–Lambert transmittance tests, and refraction by Snell/Fresnel/TIR unit tests.
+It is BVH-accelerated and **multithreaded** (deterministic — pixels are independently seeded), and
+supports direct sun + hard shadows, a Monte Carlo **path integrator** (cosine-importance-sampled
+diffuse GI, **GGX** specular, **next-event estimation + MIS**), homogeneous **volumetric "air"**
+(Beer–Lambert distance fog / aerial perspective), and **dielectric glass** — smooth and rough
+(frosted) — with Snell refraction, Fresnel, total internal reflection, and Beer–Lambert tint. The
+GI is verified by white-furnace energy-conservation tests, the fog and glass by Beer–Lambert
+transmittance tests, and refraction by Snell/Fresnel/TIR unit tests.
 
 | Direct lighting | Path-traced GI | Volumetric air | Glass (refraction) |
 |---|---|---|---|

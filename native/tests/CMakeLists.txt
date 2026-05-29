@@ -15,6 +15,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 enable_testing()
 
+find_package(Threads REQUIRED)
+
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
 add_executable(pathtracer_tests
@@ -42,6 +44,8 @@ add_executable(pathtracer_tests
 target_include_directories(pathtracer_tests PRIVATE
     "${SRC_DIR}"
     "${CMAKE_CURRENT_SOURCE_DIR}/thirdparty")
+
+target_link_libraries(pathtracer_tests PRIVATE Threads::Threads)
 
 if(NOT MSVC)
     target_compile_options(pathtracer_tests PRIVATE -Wall -Wextra)

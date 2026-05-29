@@ -11,6 +11,8 @@ project(pathtracer_tools LANGUAGES CXX)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+find_package(Threads REQUIRED)
+
 set(SRC_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../src")
 
 add_executable(cpu_reference
@@ -22,6 +24,7 @@ add_executable(cpu_reference
     "${SRC_DIR}/render/path_integrator.cpp")
 
 target_include_directories(cpu_reference PRIVATE "${SRC_DIR}")
+target_link_libraries(cpu_reference PRIVATE Threads::Threads)
 
 if(NOT MSVC)
     target_compile_options(cpu_reference PRIVATE -Wall -Wextra)

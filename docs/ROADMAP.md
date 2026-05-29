@@ -38,6 +38,9 @@ accumulation, GGX PBR; load a glTF test mesh + materials.
   blue-bends-more, chromatic-separation, and a dispersive white-furnace energy bound (`--dispersion`).
 - [x] Reference renderer is **multithreaded** (atomic-dispatched scanlines; ~4x on 4 cores) and
   bit-for-bit deterministic, since each pixel's RNG is seeded from (seed, pixel index).
+- [x] Analytic **sphere** primitive in the reference renderer (exact ray/sphere intersection),
+  alongside the triangle BVH — for smooth glass spheres in test/demo scenes (the game world stays
+  triangle/voxel-based on the GPU).
 - [ ] GPU: BLAS/TLAS + RT pipeline; primary-hit albedo; NEE shadows; temporal accumulation; GGX BSDF.
 
 ### Volumetrics ("air") — CPU groundwork

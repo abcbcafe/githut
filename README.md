@@ -98,7 +98,7 @@ and refraction/dispersion by Snell/Fresnel/TIR and Cauchy/chromatic-separation u
 |---|---|---|
 | ![direct](docs/images/cpu_reference_demo.png) | ![gi](docs/images/cpu_reference_pt.png) | ![fog](docs/images/cpu_reference_fog.png) |
 
-| Glass (refraction) | Chromatic dispersion |
+| Glass (spheres + cube) | Chromatic dispersion |
 |---|---|
 | ![glass](docs/images/cpu_reference_glass.png) | ![dispersion](docs/images/cpu_reference_dispersion.png) |
 

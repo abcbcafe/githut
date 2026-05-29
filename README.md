@@ -77,16 +77,18 @@ image for verification:
 cmake -S native/tools -B native/build-tools && cmake --build native/build-tools -j
 ./native/build-tools/cpu_reference out.ppm             # direct sun + hard shadows
 ./native/build-tools/cpu_reference out.ppm --pt        # Monte Carlo path tracer (GI)
+./native/build-tools/cpu_reference out.ppm --pt --fog  # + homogeneous "air" volumetrics
 ./native/build-tools/cpu_reference out.ppm scene.vox   # or a MagicaVoxel model
 ```
 
-It is BVH-accelerated and supports two modes — direct sun + hard shadows, and a Monte Carlo
-**path integrator** (cosine-importance-sampled diffuse GI with Russian roulette), the latter
-verified by white-furnace energy-conservation tests.
+It is BVH-accelerated and supports direct sun + hard shadows, a Monte Carlo **path integrator**
+(cosine-importance-sampled diffuse GI with Russian roulette), and homogeneous **volumetric "air"**
+(Beer–Lambert distance fog / aerial perspective). The GI is verified by white-furnace
+energy-conservation tests and the fog by Beer–Lambert transmittance tests.
 
-| Direct lighting | Path-traced GI |
-|---|---|
-| ![direct](docs/images/cpu_reference_demo.png) | ![gi](docs/images/cpu_reference_pt.png) |
+| Direct lighting | Path-traced GI | + volumetric air |
+|---|---|---|
+| ![direct](docs/images/cpu_reference_demo.png) | ![gi](docs/images/cpu_reference_pt.png) | ![fog](docs/images/cpu_reference_fog.png) |
 
 The full native GDExtension (godot-cpp + Vulkan + RTX) is built separately on a Vulkan-capable
 workstation; see [`docs/BUILD.md`](./docs/BUILD.md). CI gates the CPU-core tests

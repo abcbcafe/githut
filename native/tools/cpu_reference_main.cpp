@@ -103,11 +103,15 @@ int main(int argc, char **argv) {
     const std::string out_path = argv[1];
 
     bool path_trace = false;
+    bool fog = false;
     const char *vox_path = nullptr;
     for (int i = 2; i < argc; ++i) {
         const std::string arg = argv[i];
         if (arg == "--pt") {
             path_trace = true;
+        } else if (arg == "--fog") {
+            fog = true;
+            path_trace = true; // fog is applied in the path-traced renderer
         } else {
             vox_path = argv[i];
         }
@@ -158,6 +162,13 @@ int main(int argc, char **argv) {
         ps.spp = 256;
         ps.max_depth = 6;
         ps.env_radiance = {0.6f, 0.72f, 0.92f}; // sky dome illuminates the scene
+        if (fog) {
+            ps.medium_enabled = true;
+            ps.medium.sigma_s = {0.010f, 0.011f, 0.013f}; // slightly bluer extinction
+            ps.medium.g = 0.0f;
+            ps.fog_inscatter = {0.62f, 0.74f, 0.94f}; // aerial-perspective haze color
+            std::printf("homogeneous fog enabled (aerial perspective)\n");
+        }
         std::printf("path tracing: %d spp, max depth %d\n", ps.spp, ps.max_depth);
         fb = render::path_render(scene, cam, palette, ps, 1);
     } else {

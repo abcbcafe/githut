@@ -92,6 +92,78 @@ TEST_CASE("white furnace: albedo 0.5 reflects half the environment") {
     CHECK(center.x == doctest::Approx(0.25f).epsilon(1e-3)); // a*E = 0.5*0.5
 }
 
+namespace {
+// A single emissive voxel (albedo 0) framed head-on at distance 4 from the camera.
+TriangleScene emissive_voxel(voxel::MaterialPalette &palette, float emission) {
+    voxel::PbrMaterial lamp;
+    lamp.albedo = {0.0f, 0.0f, 0.0f};
+    lamp.emission = {emission, emission, emission};
+    palette.add(lamp); // id 1
+    voxel::VoxelChunk chunk;
+    chunk.set(4, 4, 4, 1);
+    TriangleScene scene;
+    scene.add_mesh(voxel::greedy_mesh(chunk));
+    scene.build_bvh();
+    return scene;
+}
+} // namespace
+
+TEST_CASE("a vacuum medium leaves the image unchanged") {
+    voxel::MaterialPalette palette;
+    const TriangleScene scene = single_voxel(palette, {0.7f, 0.7f, 0.7f});
+    PathSettings base;
+    base.width = 8;
+    base.height = 8;
+    base.spp = 4;
+    base.env_radiance = {0.5f, 0.5f, 0.5f};
+
+    PathSettings fogged = base;
+    fogged.medium_enabled = true; // sigma == 0 => transmittance 1 => no change
+
+    const auto a = path_render(scene, close_camera(), palette, base, 7);
+    const auto b = path_render(scene, close_camera(), palette, fogged, 7);
+    for (std::size_t i = 0; i < a.size(); ++i) {
+        CHECK(a[i].x == doctest::Approx(b[i].x));
+    }
+}
+
+TEST_CASE("absorption fog attenuates an emitter by Beer-Lambert exp(-sigma_t*d)") {
+    voxel::MaterialPalette palette;
+    const float emission = 2.0f;
+    const TriangleScene scene = emissive_voxel(palette, emission);
+
+    PathSettings s;
+    s.width = 9;
+    s.height = 9;
+    s.spp = 4;
+    s.env_radiance = {0.0f, 0.0f, 0.0f};
+    s.medium_enabled = true;
+    s.medium.sigma_a = {0.15f, 0.15f, 0.15f}; // absorption only
+    s.fog_inscatter = {0.0f, 0.0f, 0.0f};      // no in-scatter for a pure absorber
+
+    const auto fb = path_render(scene, close_camera(), palette, s, 1);
+    // Camera at z=9 looking -z hits the front face at z=5 => distance 4.
+    const float expected = emission * std::exp(-0.15f * 4.0f);
+    CHECK(fb[4 * 9 + 4].x == doctest::Approx(expected).epsilon(2e-2));
+}
+
+TEST_CASE("thick fog blends a surface toward the in-scatter color") {
+    voxel::MaterialPalette palette;
+    const TriangleScene scene = emissive_voxel(palette, 2.0f);
+
+    PathSettings s;
+    s.width = 9;
+    s.height = 9;
+    s.spp = 4;
+    s.medium_enabled = true;
+    s.medium.sigma_a = {5.0f, 5.0f, 5.0f}; // very thick => T ~ 0
+    s.fog_inscatter = {0.3f, 0.4f, 0.5f};
+
+    const auto fb = path_render(scene, close_camera(), palette, s, 1);
+    CHECK(fb[4 * 9 + 4].x == doctest::Approx(0.3f).epsilon(1e-2));
+    CHECK(fb[4 * 9 + 4].z == doctest::Approx(0.5f).epsilon(1e-2));
+}
+
 TEST_CASE("emissive surface is at least as bright as its emission") {
     voxel::MaterialPalette palette;
     voxel::PbrMaterial lamp;

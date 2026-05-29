@@ -21,7 +21,19 @@ accumulation, GGX PBR; load a glTF test mesh + materials.
 - [x] CPU BVH (analogue of the GPU BLAS), verified against brute force; PCG RNG + cosine
   hemisphere sampling; Monte Carlo diffuse **path integrator** with Russian roulette, verified by
   white-furnace energy-conservation tests (`native/src/render/{bvh,path_integrator}.cpp`).
+- [x] GGX microfacet **BSDF** module (NDF + Smith + Fresnel-Schlick + importance sampling),
+  verified by NDF-normalization, Smith-bounds, Fresnel-endpoint, and single-scatter energy tests
+  (`native/src/render/bsdf.h`). Ready to wire into the integrator/GPU.
 - [ ] GPU: BLAS/TLAS + RT pipeline; primary-hit albedo; NEE shadows; temporal accumulation; GGX BSDF.
+
+### Volumetrics ("air") — CPU groundwork
+- [x] Homogeneous-medium primitives: Beer–Lambert transmittance, free-flight distance sampling,
+  Henyey–Greenstein phase (eval + sampling), verified by transmittance/mean-free-path and phase
+  normalization/mean-cosine tests (`native/src/render/medium.h`).
+- [x] Distance fog / aerial perspective in the path integrator, verified by a Beer–Lambert
+  attenuation test (`--pt --fog`).
+- [ ] GPU: full volumetric scattering (delta tracking + HG multiple scattering) using these
+  primitives; participating media tied to acoustic absorption later.
 - **Deliverable:** a static PBR scene converging cleanly via accumulation, camera fly-through.
 
 ## M2 — Voxel world

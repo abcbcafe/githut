@@ -19,12 +19,15 @@ Vec3 mat_emission(const voxel::PbrMaterial &m) {
 } // namespace
 
 Vec3 trace_path(const TriangleScene &scene, const voxel::MaterialPalette &palette, Ray ray,
-                Pcg32 &rng, int max_depth, const Vec3 &env_radiance) {
+                Pcg32 &rng, int max_depth, const Vec3 &env_radiance, float *out_primary_t) {
     Vec3 radiance{0.0f, 0.0f, 0.0f};
     Vec3 beta{1.0f, 1.0f, 1.0f}; // path throughput
 
     for (int depth = 0; depth < max_depth; ++depth) {
         const Hit hit = scene.closest_hit(ray);
+        if (depth == 0 && out_primary_t != nullptr) {
+            *out_primary_t = hit.hit ? hit.t : -1.0f;
+        }
         if (!hit.hit) {
             radiance = radiance + mul(beta, env_radiance); // escaped to the environment
             break;
@@ -81,8 +84,19 @@ std::vector<Vec3> path_render(const TriangleScene &scene, const PinholeCamera &c
                 const float sy =
                         1.0f - (static_cast<float>(y) + jy) / static_cast<float>(settings.height);
                 const Ray ray = camera.generate_ray(sx, sy);
-                sum = sum + trace_path(scene, palette, ray, rng, settings.max_depth,
-                                       settings.env_radiance);
+
+                float primary_t = -1.0f;
+                Vec3 L = trace_path(scene, palette, ray, rng, settings.max_depth,
+                                    settings.env_radiance, &primary_t);
+
+                // Distance fog / aerial perspective on the primary segment.
+                if (settings.medium_enabled && primary_t > 0.0f) {
+                    const Vec3 tr = transmittance(settings.medium, primary_t);
+                    L = Vec3{L.x * tr.x + settings.fog_inscatter.x * (1.0f - tr.x),
+                             L.y * tr.y + settings.fog_inscatter.y * (1.0f - tr.y),
+                             L.z * tr.z + settings.fog_inscatter.z * (1.0f - tr.z)};
+                }
+                sum = sum + L;
             }
             const float inv = 1.0f / static_cast<float>(settings.spp);
             fb[pixel] = sum * inv;

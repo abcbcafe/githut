@@ -76,6 +76,11 @@ texture each frame (correct but slow — acceptable since performance is not an 
 - BSDF: metallic-roughness PBR (GGX + multiscatter, Lambertian/Oren-Nayar, Fresnel-Schlick),
   1:1 with Godot `BaseMaterial3D`. Glass/transmission deferred.
 - Lights: analytic sun + procedural sky; emissive triangles as area lights; explicit point/spot.
+- **Volumetrics ("air"):** a homogeneous participating medium (per-channel absorption/scattering +
+  Henyey–Greenstein phase). The CPU reference starts with exact Beer–Lambert distance fog / aerial
+  perspective; the GPU path will do full volumetric scattering (delta tracking + HG multiple
+  scattering) using the same primitives (`native/src/render/medium.h`). The medium's absorption
+  later ties into the acoustic model.
 
 ### Skinned Mixamo pipeline
 - Mixamo FBX → Godot importer → `Skeleton3D` + `AnimationPlayer` (preset: scale 0.01, root motion).

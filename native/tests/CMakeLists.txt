@@ -27,6 +27,8 @@ add_executable(pathtracer_tests
     test_sampling.cpp
     test_bvh.cpp
     test_path_integrator.cpp
+    test_medium.cpp
+    test_bsdf.cpp
     # CPU core under test (must stay free of Godot/Vulkan includes):
     "${SRC_DIR}/voxel/greedy_mesher.cpp"
     "${SRC_DIR}/voxel/vox_loader.cpp"

@@ -13,6 +13,7 @@
 #include "core/sampling.h"
 #include "render/camera.h"
 #include "render/cpu_reference.h"
+#include "render/medium.h"
 #include "voxel/material_palette.h"
 
 namespace pathtracer::render {
@@ -23,12 +24,22 @@ struct PathSettings {
     int spp = 16;          // samples per pixel
     int max_depth = 16;    // max bounces
     core::Vec3 env_radiance{0.0f, 0.0f, 0.0f}; // constant background/illumination
+
+    // Homogeneous "air" volumetrics applied as distance fog / aerial perspective on
+    // the primary segment: L = T(d)*L_surface + (1 - T(d))*fog_inscatter, where d is
+    // the camera-to-surface distance and T is Beer-Lambert transmittance. The medium
+    // primitives (medium.h) also back the future GPU volumetric scattering path.
+    bool medium_enabled = false;
+    HomogeneousMedium medium;
+    core::Vec3 fog_inscatter{0.0f, 0.0f, 0.0f};
 };
 
-// Estimate incoming radiance along a single primary ray.
+// Estimate incoming radiance along a single primary ray. When out_primary_t is
+// provided it receives the camera-to-first-surface distance (-1 if the primary ray
+// misses), used by the caller to apply distance fog.
 core::Vec3 trace_path(const TriangleScene &scene, const voxel::MaterialPalette &palette,
                       core::Ray ray, core::Pcg32 &rng, int max_depth,
-                      const core::Vec3 &env_radiance);
+                      const core::Vec3 &env_radiance, float *out_primary_t = nullptr);
 
 // Render a full framebuffer (row-major linear RGB). Deterministic for a given seed.
 std::vector<core::Vec3> path_render(const TriangleScene &scene, const PinholeCamera &camera,

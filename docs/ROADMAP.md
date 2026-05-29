@@ -15,6 +15,10 @@ Highest uncertainty; throwaway spikes allowed.
 ## M1 — Minimal path tracer, static triangle scene
 BLAS/TLAS, pinhole raygen, primary-hit albedo, hardcoded sun + NEE shadows, temporal
 accumulation, GGX PBR; load a glTF test mesh + materials.
+- [x] CPU math core: `Vec3`, `Ray`, `Aabb`, Möller–Trumbore ray/triangle, ray/AABB slab test
+  (`native/src/core/math.h`) — reused by the renderer and the acoustic tracer.
+- [x] `PinholeCamera` primary-ray generation (matches the planned raygen math), unit-tested.
+- [ ] BLAS/TLAS + RT pipeline; primary-hit albedo; NEE shadows; temporal accumulation; GGX BSDF.
 - **Deliverable:** a static PBR scene converging cleanly via accumulation, camera fly-through.
 
 ## M2 — Voxel world
@@ -23,7 +27,7 @@ TLAS chunk instances.
 - [x] CPU core: `VoxelChunk` (dense 32³), `MaterialPalette`, greedy mesher → `MeshData`.
 - [x] Unit tests (doctest) covering meshing invariants, face merging, material boundaries.
 - [ ] Build BLAS per chunk from `MeshData`; chunk → TLAS instances.
-- [ ] MagicaVoxel `.vox` import → palette + chunks.
+- [x] MagicaVoxel `.vox` import → palette + chunks (`vox_loader`), unit-tested end-to-end.
 - [ ] Jolt static collider per chunk.
 - **Deliverable:** walk a coarse-voxel level with per-material PBR.
 

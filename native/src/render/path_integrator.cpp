@@ -7,8 +7,11 @@
 #include <vector>
 
 #include "render/bsdf.h"
+#include "render/caustics.h"
 
 namespace pathtracer::render {
+
+constexpr float kInvPi = 1.0f / 3.14159265358979323846f;
 
 using core::Pcg32;
 using core::Ray;
@@ -128,7 +131,8 @@ Vec3 absorb(const Vec3 &beta, const Vec3 &sigma, float dist) {
 } // namespace
 
 Vec3 trace_path(const TriangleScene &scene, const voxel::MaterialPalette &palette, Ray ray,
-                Pcg32 &rng, int max_depth, const Vec3 &env_radiance, float *out_primary_t) {
+                Pcg32 &rng, int max_depth, const Vec3 &env_radiance, float *out_primary_t,
+                const CausticMap *caustic) {
     Vec3 radiance{0.0f, 0.0f, 0.0f};
     Vec3 beta{1.0f, 1.0f, 1.0f}; // path throughput
     bool inside = false;         // traveling inside a glass medium?
@@ -179,6 +183,13 @@ Vec3 trace_path(const TriangleScene &scene, const voxel::MaterialPalette &palett
 
         radiance = radiance + mul(beta, mat_emission(mat));
 
+        // Caustic map: light -> glass -> here, as extra incident irradiance.
+        if (caustic != nullptr) {
+            const Vec3 p_hit = ray.origin + ray.dir * hit.t;
+            radiance = radiance +
+                       mul(beta, mul(mat_albedo(mat), caustic->irradiance(p_hit))) * kInvPi;
+        }
+
         // Shading normal oriented against the incoming ray (two-sided surfaces).
         Vec3 n = hit.normal;
         if (core::dot(n, ray.dir) > 0.0f) {
@@ -207,10 +218,10 @@ Vec3 trace_path(const TriangleScene &scene, const voxel::MaterialPalette &palett
 }
 
 Vec3 trace_path_nee(const TriangleScene &scene, const voxel::MaterialPalette &palette, Ray ray,
-                    Pcg32 &rng, int max_depth, const Vec3 &env_radiance, float *out_primary_t) {
+                    Pcg32 &rng, int max_depth, const Vec3 &env_radiance, float *out_primary_t,
+                    const CausticMap *caustic) {
     Vec3 radiance{0.0f, 0.0f, 0.0f};
     Vec3 beta{1.0f, 1.0f, 1.0f};
-    const float kInvPi = 1.0f / 3.14159265358979323846f;
     const float area = scene.total_emissive_area();
 
     bool prev_specular = true; // camera ray has no light-sampling alternative
@@ -283,6 +294,11 @@ Vec3 trace_path_nee(const TriangleScene &scene, const voxel::MaterialPalette &pa
         }
         const Vec3 albedo = mat_albedo(mat);
         const Vec3 p = ray.origin + ray.dir * hit.t;
+
+        // Caustic map: light -> glass -> here, as extra incident irradiance.
+        if (caustic != nullptr) {
+            radiance = radiance + mul(beta, mul(albedo, caustic->irradiance(p))) * kInvPi;
+        }
 
         // Next-event estimation: sample the emissive surface directly.
         if (area > 0.0f) {
@@ -361,9 +377,11 @@ std::vector<Vec3> path_render(const TriangleScene &scene, const PinholeCamera &c
                     float primary_t = -1.0f;
                     Vec3 L = settings.next_event_estimation
                                      ? trace_path_nee(scene, palette, ray, rng, settings.max_depth,
-                                                      settings.env_radiance, &primary_t)
+                                                      settings.env_radiance, &primary_t,
+                                                      settings.caustic)
                                      : trace_path(scene, palette, ray, rng, settings.max_depth,
-                                                  settings.env_radiance, &primary_t);
+                                                  settings.env_radiance, &primary_t,
+                                                  settings.caustic);
 
                     // Distance fog / aerial perspective on the primary segment.
                     if (settings.medium_enabled && primary_t > 0.0f) {

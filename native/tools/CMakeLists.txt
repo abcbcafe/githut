@@ -21,7 +21,8 @@ add_executable(cpu_reference
     "${SRC_DIR}/voxel/vox_loader.cpp"
     "${SRC_DIR}/render/cpu_reference.cpp"
     "${SRC_DIR}/render/bvh.cpp"
-    "${SRC_DIR}/render/path_integrator.cpp")
+    "${SRC_DIR}/render/path_integrator.cpp"
+    "${SRC_DIR}/render/caustics.cpp")
 
 target_include_directories(cpu_reference PRIVATE "${SRC_DIR}")
 target_link_libraries(cpu_reference PRIVATE Threads::Threads)

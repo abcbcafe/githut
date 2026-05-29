@@ -18,6 +18,8 @@
 
 namespace pathtracer::render {
 
+class CausticMap;
+
 struct PathSettings {
     int width = 160;
     int height = 90;
@@ -38,6 +40,11 @@ struct PathSettings {
     // result as pure BSDF sampling in expectation, with much lower variance. Requires
     // scene.build_lights() to have been called.
     bool next_event_estimation = false;
+
+    // Optional precomputed caustic map (light-traced floor irradiance). When set, its
+    // irradiance is added at diffuse vertices to render light -> glass -> floor caustics
+    // that the camera path tracer cannot find on its own.
+    const CausticMap *caustic = nullptr;
 };
 
 // Estimate incoming radiance along a single primary ray. When out_primary_t is
@@ -45,13 +52,15 @@ struct PathSettings {
 // misses), used by the caller to apply distance fog.
 core::Vec3 trace_path(const TriangleScene &scene, const voxel::MaterialPalette &palette,
                       core::Ray ray, core::Pcg32 &rng, int max_depth,
-                      const core::Vec3 &env_radiance, float *out_primary_t = nullptr);
+                      const core::Vec3 &env_radiance, float *out_primary_t = nullptr,
+                      const CausticMap *caustic = nullptr);
 
 // As trace_path, but with next-event estimation + MIS (balance heuristic) for the
 // scene's emissive area lights. Unbiased; lower variance than trace_path.
 core::Vec3 trace_path_nee(const TriangleScene &scene, const voxel::MaterialPalette &palette,
                           core::Ray ray, core::Pcg32 &rng, int max_depth,
-                          const core::Vec3 &env_radiance, float *out_primary_t = nullptr);
+                          const core::Vec3 &env_radiance, float *out_primary_t = nullptr,
+                          const CausticMap *caustic = nullptr);
 
 // Render a full framebuffer (row-major linear RGB). Deterministic for a given seed.
 std::vector<core::Vec3> path_render(const TriangleScene &scene, const PinholeCamera &camera,

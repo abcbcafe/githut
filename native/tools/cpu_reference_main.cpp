@@ -11,6 +11,7 @@
 #include <string>
 
 #include "core/math.h"
+#include "render/caustics.h"
 #include "render/camera.h"
 #include "render/cpu_reference.h"
 #include "render/path_integrator.h"
@@ -19,6 +20,62 @@
 #include "voxel/vox_loader.h"
 
 using namespace pathtracer;
+
+// Dedicated caustic showcase: a clear glass sphere over a diffuse floor, lit by an
+// overhead panel. Photons are traced through the sphere to build a floor caustic map,
+// then the camera pass reads it. Returns 0 on success.
+static int render_caustics(const std::string &out_path, int spp) {
+    voxel::MaterialPalette palette;
+    voxel::PbrMaterial floor;
+    floor.albedo = {0.80f, 0.80f, 0.82f};
+    const auto floor_id = palette.add(floor);
+    voxel::PbrMaterial light;
+    light.emission = {60.0f, 58.0f, 52.0f};
+    const auto light_id = palette.add(light);
+    voxel::PbrMaterial glass;
+    glass.transmission = 1.0f;
+    glass.ior = 1.5f;
+    glass.roughness = 0.0f;
+    const auto glass_id = palette.add(glass);
+
+    voxel::VoxelChunk chunk;
+    for (int z = 0; z < 24; ++z)
+        for (int x = 0; x < 24; ++x) chunk.set(x, 0, z, floor_id); // floor, top at y=1
+    for (int z = 9; z < 15; ++z)
+        for (int x = 9; x < 15; ++x) chunk.set(x, 22, z, light_id); // overhead panel
+
+    render::TriangleScene scene;
+    scene.add_mesh(voxel::greedy_mesh(chunk));
+    scene.build_bvh();
+    scene.build_lights(palette);
+    scene.add_sphere({12.0f, 6.0f, 12.0f}, 3.5f, glass_id);
+
+    render::CausticMap caustics(0.0f, 0.0f, 24.0f, 24.0f, 320, 1.0f);
+    const int photons = 6'000'000;
+    std::printf("tracing %d caustic photons...\n", photons);
+    render::trace_caustics(scene, palette, caustics, photons, 1);
+
+    render::PathSettings ps;
+    ps.width = 640;
+    ps.height = 360;
+    ps.spp = spp > 0 ? spp : 256;
+    ps.max_depth = 6;
+    ps.env_radiance = {0.05f, 0.06f, 0.08f};
+    ps.next_event_estimation = true;
+    ps.caustic = &caustics;
+
+    const float aspect = static_cast<float>(ps.width) / ps.height;
+    render::PinholeCamera cam({12.0f, 13.0f, 30.0f}, core::Vec3{12, 1, 11} - core::Vec3{12, 13, 30},
+                             {0, 1, 0}, 0.7f, aspect);
+    std::printf("path tracing caustic scene: %d spp\n", ps.spp);
+    const auto fb = render::path_render(scene, cam, palette, ps, 1);
+    if (!render::write_ppm(out_path, fb, ps.width, ps.height)) {
+        std::fprintf(stderr, "failed to write %s\n", out_path.c_str());
+        return 1;
+    }
+    std::printf("wrote %s (%dx%d)\n", out_path.c_str(), ps.width, ps.height);
+    return 0;
+}
 
 namespace {
 
@@ -140,11 +197,14 @@ int main(int argc, char **argv) {
     bool nee = false;
     bool glass = false;
     bool dispersion = false;
+    bool caustics = false;
     int spp_override = -1;
     const char *vox_path = nullptr;
     for (int i = 2; i < argc; ++i) {
         const std::string arg = argv[i];
-        if (arg == "--pt") {
+        if (arg == "--caustics") {
+            caustics = true;
+        } else if (arg == "--pt") {
             path_trace = true;
         } else if (arg == "--fog") {
             fog = true;
@@ -164,6 +224,10 @@ int main(int argc, char **argv) {
         } else {
             vox_path = argv[i];
         }
+    }
+
+    if (caustics) {
+        return render_caustics(out_path, spp_override);
     }
 
     voxel::VoxelChunk chunk;

@@ -36,12 +36,14 @@ add_executable(pathtracer_tests
     test_glass.cpp
     test_dispersion.cpp
     test_sphere.cpp
+    test_caustics.cpp
     # CPU core under test (must stay free of Godot/Vulkan includes):
     "${SRC_DIR}/voxel/greedy_mesher.cpp"
     "${SRC_DIR}/voxel/vox_loader.cpp"
     "${SRC_DIR}/render/cpu_reference.cpp"
     "${SRC_DIR}/render/bvh.cpp"
-    "${SRC_DIR}/render/path_integrator.cpp")
+    "${SRC_DIR}/render/path_integrator.cpp"
+    "${SRC_DIR}/render/caustics.cpp")
 
 target_include_directories(pathtracer_tests PRIVATE
     "${SRC_DIR}"

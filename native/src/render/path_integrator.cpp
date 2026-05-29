@@ -20,34 +20,81 @@ Vec3 mat_emission(const voxel::PbrMaterial &m) {
     return {m.emission[0], m.emission[1], m.emission[2]};
 }
 
-// Smooth-dielectric (glass) scattering. d is the incoming ray direction (unit, into
-// the surface) and n_geo the outward geometric normal. Stochastically reflects or
-// refracts proportional to the Fresnel reflectance (so the throughput weight is 1),
-// applies the radiance-scaling factor (eta_i/eta_t)^2 on refraction, toggles the
-// `inside` flag, and records the glass absorption coefficient when entering. Returns
-// the outgoing ray direction.
+// Dielectric (glass) scattering. d is the incoming ray direction (unit, into the
+// surface) and n_geo the outward geometric normal. A microfacet normal is sampled
+// from the GGX distribution (the geometric normal when roughness is 0, giving smooth
+// glass); the surface then stochastically reflects or refracts proportional to the
+// Fresnel reflectance (so the F term cancels). Applies the microfacet throughput
+// weight G*|d.m|/(|d.n|*|m.n|), the radiance-scaling (eta_i/eta_t)^2 on refraction,
+// toggles `inside`, and records the absorption coefficient when entering.
 Vec3 dielectric_bounce(const Vec3 &d, const Vec3 &n_geo, const voxel::PbrMaterial &mat,
                        Pcg32 &rng, Vec3 &beta, bool &inside, Vec3 &glass_sigma) {
     const bool entering = core::dot(d, n_geo) < 0.0f;
-    Vec3 n = n_geo;
+    Vec3 ns = entering ? n_geo : -n_geo; // shading normal facing the incoming ray
     float eta_i = 1.0f;
     float eta_t = mat.ior;
     if (!entering) {
-        n = -n_geo; // face the incoming ray
         std::swap(eta_i, eta_t);
     }
-    const float cos_in = -core::dot(d, n); // > 0
+    const float alpha = mat.roughness * mat.roughness; // perceptual roughness -> GGX alpha
+
+    auto enter_exit = [&](bool refracted) {
+        if (refracted) {
+            beta = beta * ((eta_i * eta_i) / (eta_t * eta_t));
+            inside = !inside;
+            glass_sigma = entering
+                                  ? Vec3{mat.attenuation[0], mat.attenuation[1], mat.attenuation[2]}
+                                  : Vec3{0.0f, 0.0f, 0.0f};
+        }
+    };
+
+    // Smooth dielectric: microfacet normal == shading normal.
+    if (alpha < 1e-6f) {
+        const float cos_in = -core::dot(d, ns);
+        const float fr = bsdf::fresnel_dielectric(cos_in, eta_i, eta_t);
+        Vec3 wt;
+        if (rng.next_float() < fr || !bsdf::refract(d, ns, eta_i / eta_t, wt)) {
+            return bsdf::reflect_ray(d, ns);
+        }
+        enter_exit(true);
+        return wt;
+    }
+
+    // Rough dielectric (frosted glass): sample a GGX microfacet normal (Walter 2007).
+    const Vec3 m = core::normalize(
+            core::to_world(bsdf::ggx_sample_normal_local(alpha, rng.next_float(), rng.next_float()),
+                           ns));
+    const float cos_in = -core::dot(d, m);
+    if (cos_in <= 0.0f) {
+        beta = Vec3{0.0f, 0.0f, 0.0f}; // back-facing microfacet
+        return ns;
+    }
     const float fr = bsdf::fresnel_dielectric(cos_in, eta_i, eta_t);
 
+    Vec3 wi;
+    bool refracted = false;
     Vec3 wt;
-    if (rng.next_float() < fr || !bsdf::refract(d, n, eta_i / eta_t, wt)) {
-        return bsdf::reflect_ray(d, n); // reflection (or TIR): no medium change
+    if (rng.next_float() < fr || !bsdf::refract(d, m, eta_i / eta_t, wt)) {
+        wi = bsdf::reflect_ray(d, m);
+        if (core::dot(wi, ns) <= 0.0f) { // reflected below the surface
+            beta = Vec3{0.0f, 0.0f, 0.0f};
+            return ns;
+        }
+    } else {
+        wi = wt;
+        refracted = true;
+        if (core::dot(wi, ns) >= 0.0f) { // refracted to the wrong side
+            beta = Vec3{0.0f, 0.0f, 0.0f};
+            return ns;
+        }
     }
-    beta = beta * ((eta_i * eta_i) / (eta_t * eta_t)); // radiance scaling across the boundary
-    inside = !inside;
-    glass_sigma = entering ? Vec3{mat.attenuation[0], mat.attenuation[1], mat.attenuation[2]}
-                           : Vec3{0.0f, 0.0f, 0.0f};
-    return wt;
+
+    const float g = bsdf::smith_g(std::fabs(core::dot(d, ns)), std::fabs(core::dot(wi, ns)), alpha);
+    const float weight = std::fabs(core::dot(d, m)) * g /
+                         (std::fabs(core::dot(d, ns)) * std::fabs(core::dot(m, ns)));
+    beta = beta * weight;
+    enter_exit(refracted);
+    return wi;
 }
 
 // Beer-Lambert attenuation over a segment of length `dist` inside a glass medium.

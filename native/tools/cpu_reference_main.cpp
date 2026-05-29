@@ -52,6 +52,7 @@ void build_demo(voxel::VoxelChunk &chunk, voxel::MaterialPalette &palette, bool 
         blue.albedo = {0.0f, 0.0f, 0.0f};
         blue.transmission = 1.0f;
         blue.ior = 1.5f;
+        blue.roughness = 0.0f; // smooth, clear glass
         blue.attenuation = {0.05f, 0.02f, 0.08f}; // faint tint
     }
     const auto blue_id = palette.add(blue);
@@ -61,11 +62,32 @@ void build_demo(voxel::VoxelChunk &chunk, voxel::MaterialPalette &palette, bool 
     lamp.emission = {2.4f, 2.2f, 1.8f};
     const auto lamp_id = palette.add(lamp);
 
+    voxel::PbrMaterial wall;
+    wall.albedo = {0.72f, 0.69f, 0.60f}; // warm back wall
+    const auto wall_id = palette.add(wall);
+
+    voxel::PbrMaterial yellow;
+    yellow.albedo = {0.85f, 0.72f, 0.15f};
+    const auto yellow_id = palette.add(yellow);
+
+    // A frosted-glass slab (rough dielectric), only shown alongside the glass block.
+    voxel::PbrMaterial frosted;
+    frosted.transmission = 1.0f;
+    frosted.ior = 1.5f;
+    frosted.roughness = 0.32f;
+    frosted.attenuation = {0.04f, 0.02f, 0.05f};
+    const auto frosted_id = palette.add(frosted);
+
     box(chunk, 0, 0, 0, 21, 0, 21, floor_id); // floor slab
-    box(chunk, 3, 1, 3, 4, 6, 4, red_id);     // red pillar
-    box(chunk, 16, 1, 5, 17, 8, 6, green_id); // green pillar
-    box(chunk, 9, 1, 14, 12, 4, 17, blue_id); // blue block
-    box(chunk, 8, 7, 8, 9, 8, 9, lamp_id);    // emissive block
+    box(chunk, 0, 1, 0, 21, 7, 0, wall_id);    // back wall (far side)
+    box(chunk, 3, 1, 3, 4, 6, 4, red_id);      // red pillar
+    box(chunk, 16, 1, 5, 17, 8, 6, green_id);  // green pillar
+    box(chunk, 9, 1, 14, 12, 4, 17, blue_id);  // blue block / glass cube
+    box(chunk, 17, 1, 15, 19, 3, 17, yellow_id); // yellow box
+    box(chunk, 8, 7, 8, 9, 8, 9, lamp_id);     // emissive block
+    if (glass_block) {
+        box(chunk, 5, 1, 9, 6, 6, 10, frosted_id); // frosted-glass slab
+    }
 }
 
 // Bounds of solid voxels, used to auto-frame the camera.

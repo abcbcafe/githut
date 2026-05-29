@@ -116,13 +116,20 @@ inline float microfacet_pdf(const core::Vec3 &wo, const core::Vec3 &wi, float al
     return pdf_h / (4.0f * wo_dot_h);
 }
 
-// Importance-sample the GGX reflection lobe. Returns the sampled incident direction
-// wi in the local frame (may be below the surface for grazing wo; caller checks).
-inline core::Vec3 microfacet_sample(const core::Vec3 &wo, float alpha, float xi1, float xi2) {
+// Sample a GGX microfacet normal in the local frame (z up). At alpha == 0 this
+// returns the geometric normal (perfect mirror/dielectric), so the rough and smooth
+// paths agree in the limit.
+inline core::Vec3 ggx_sample_normal_local(float alpha, float xi1, float xi2) {
     const float cos_h = std::sqrt((1.0f - xi1) / (1.0f + (alpha * alpha - 1.0f) * xi1));
     const float sin_h = std::sqrt(std::fmax(0.0f, 1.0f - cos_h * cos_h));
     const float phi = 2.0f * kPi * xi2;
-    const core::Vec3 h{sin_h * std::cos(phi), sin_h * std::sin(phi), cos_h};
+    return {sin_h * std::cos(phi), sin_h * std::sin(phi), cos_h};
+}
+
+// Importance-sample the GGX reflection lobe. Returns the sampled incident direction
+// wi in the local frame (may be below the surface for grazing wo; caller checks).
+inline core::Vec3 microfacet_sample(const core::Vec3 &wo, float alpha, float xi1, float xi2) {
+    const core::Vec3 h = ggx_sample_normal_local(alpha, xi1, xi2);
     return reflect(wo, h);
 }
 

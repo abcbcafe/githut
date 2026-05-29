@@ -36,6 +36,7 @@ TriangleScene glass_in_front_of_wall(voxel::MaterialPalette &palette, float emis
     voxel::PbrMaterial glass;
     glass.transmission = 1.0f;
     glass.ior = 1.5f;
+    glass.roughness = 0.0f; // smooth
     glass.attenuation = attenuation;
     const auto glass_id = palette.add(glass);
 
@@ -102,6 +103,82 @@ TEST_CASE("tinted glass attenuates by Beer-Lambert through its thickness") {
     const auto fb = path_render(scene, head_on(), palette, s, 9);
     const double expected = 0.96 * 0.96 * std::exp(-sigma * 1.0f) * E;
     CHECK(center_mean_x(fb, s.width, s.height, 4) == doctest::Approx(expected).epsilon(0.05));
+}
+
+namespace {
+// A single convex glass voxel in a uniform environment, viewed close up. A lossless
+// dielectric in a constant field must return that field's radiance (energy
+// conservation) — this exercises the Fresnel split and the (eta_i/eta_t)^2 factor.
+TriangleScene glass_voxel(voxel::MaterialPalette &palette, float roughness) {
+    voxel::PbrMaterial glass;
+    glass.transmission = 1.0f;
+    glass.ior = 1.5f;
+    glass.roughness = roughness;
+    glass.attenuation = {0.0f, 0.0f, 0.0f}; // lossless
+    palette.add(glass);                      // id 1
+    voxel::VoxelChunk chunk;
+    for (int z = 4; z <= 5; ++z)
+        for (int y = 4; y <= 5; ++y)
+            for (int x = 4; x <= 5; ++x) chunk.set(x, y, z, 1);
+    TriangleScene scene;
+    scene.add_mesh(voxel::greedy_mesh(chunk));
+    scene.build_bvh();
+    return scene;
+}
+
+PinholeCamera furnace_camera() {
+    return PinholeCamera({4.5f, 4.5f, 12.0f}, {0, 0, -1}, {0, 1, 0}, 0.4f, 1.0f);
+}
+} // namespace
+
+TEST_CASE("white furnace: lossless glass never creates energy (smooth and frosted)") {
+    // A passive dielectric cannot make a uniform environment brighter than itself.
+    // (It can read *below* env: a glass cube traps some light via total internal
+    // reflection, which is physically correct, so we test the conservation upper
+    // bound plus substantial transmission rather than exact equality.)
+    for (float roughness : {0.0f, 0.5f}) {
+        voxel::MaterialPalette palette;
+        const TriangleScene scene = glass_voxel(palette, roughness);
+        PathSettings s;
+        s.width = 25;
+        s.height = 25;
+        s.spp = 400;
+        s.max_depth = 24;
+        s.env_radiance = {0.5f, 0.5f, 0.5f};
+        const auto fb = path_render(scene, furnace_camera(), palette, s, 11);
+        const double m = center_mean_x(fb, s.width, s.height, 5);
+        CHECK(m <= 0.5 + 0.01); // energy conservation: never brighter than the field
+        CHECK(m > 0.35);        // but transmits/reflects most of it
+    }
+}
+
+TEST_CASE("frosted glass still transmits most of an emitter") {
+    voxel::MaterialPalette palette;
+    voxel::PbrMaterial wall;
+    wall.emission = {1.0f, 1.0f, 1.0f};
+    const auto wall_id = palette.add(wall);
+    voxel::PbrMaterial frosted;
+    frosted.transmission = 1.0f;
+    frosted.ior = 1.5f;
+    frosted.roughness = 0.35f;
+    const auto frosted_id = palette.add(frosted);
+
+    voxel::VoxelChunk chunk;
+    box(chunk, 0, 0, 0, 11, 11, 0, wall_id);
+    box(chunk, 3, 3, 5, 8, 8, 5, frosted_id);
+    TriangleScene scene;
+    scene.add_mesh(voxel::greedy_mesh(chunk));
+    scene.build_bvh();
+
+    PathSettings s;
+    s.width = 31;
+    s.height = 31;
+    s.spp = 256;
+    s.env_radiance = {0.0f, 0.0f, 0.0f};
+    const auto fb = path_render(scene, head_on(), palette, s, 4);
+    // Frosted glass scatters but is lossless; the central region still averages a
+    // large fraction of the emitter's radiance.
+    CHECK(center_mean_x(fb, s.width, s.height, 5) > 0.6);
 }
 
 TEST_CASE("opaque-vs-glass: glass lets the wall show through") {

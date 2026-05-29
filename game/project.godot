@@ -1,0 +1,23 @@
+; Godot 4.6 project file.
+;
+; Rendering note: the game's 3D image is produced by the custom path tracer in the
+; `pathtracer` GDExtension, not by Godot's renderer. Godot is configured to do as
+; little 3D drawing as possible and is used to composite the path-traced texture
+; (drawn fullscreen) with the Control-node UI on top.
+
+config_version=5
+
+[application]
+
+config/name="Path-Traced Voxel FPS"
+config/description="Experimental GoldenEye-style FPS with a custom Vulkan path tracer and acoustic ray tracer."
+run/main_scene="res://scenes/m0_bridge_smoke.tscn"
+config/features=PackedStringArray("4.6", "Forward Plus")
+
+[physics]
+
+3d/physics_engine="Jolt Physics"
+
+[rendering]
+
+renderer/rendering_method="forward_plus"

@@ -1,4 +1,31 @@
-_project
-server/node_modules
-web/js/vendors
-support
+# ---- Native GDExtension build artifacts ----
+native/build/
+native/cmake-build-*/
+*.o
+*.obj
+*.so
+*.dylib
+*.dll
+*.pdb
+compile_commands.json
+
+# ---- Compiled shaders ----
+native/shaders/**/*.spv
+
+# ---- Godot ----
+game/.godot/
+game/.import/
+game/export.cfg
+game/export_presets.cfg
+*.translation
+
+# ---- Editor / OS ----
+.vscode/
+.idea/
+.cache/
+*.swp
+.DS_Store
+
+# ---- Third-party build trees (sources are git submodules) ----
+native/thirdparty/**/build/
+native/thirdparty/**/bin/

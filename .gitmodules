@@ -1,0 +1,7 @@
+[submodule "native/thirdparty/godot-cpp"]
+	path = native/thirdparty/godot-cpp
+	url = https://github.com/godotengine/godot-cpp.git
+	branch = 4.5
+[submodule "native/thirdparty/VulkanMemoryAllocator"]
+	path = native/thirdparty/VulkanMemoryAllocator
+	url = https://github.com/GPUOpen-LibrariesAndSDKs/VulkanMemoryAllocator.git

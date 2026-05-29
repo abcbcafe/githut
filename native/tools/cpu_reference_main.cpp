@@ -104,6 +104,8 @@ int main(int argc, char **argv) {
 
     bool path_trace = false;
     bool fog = false;
+    bool nee = false;
+    int spp_override = -1;
     const char *vox_path = nullptr;
     for (int i = 2; i < argc; ++i) {
         const std::string arg = argv[i];
@@ -112,6 +114,11 @@ int main(int argc, char **argv) {
         } else if (arg == "--fog") {
             fog = true;
             path_trace = true; // fog is applied in the path-traced renderer
+        } else if (arg == "--nee") {
+            nee = true;
+            path_trace = true;
+        } else if (arg.rfind("--spp=", 0) == 0) {
+            spp_override = std::atoi(arg.c_str() + 6);
         } else {
             vox_path = argv[i];
         }
@@ -137,7 +144,9 @@ int main(int argc, char **argv) {
     render::TriangleScene scene;
     scene.add_mesh(mesh);
     scene.build_bvh();
-    std::printf("greedy mesh: %u quads, %zu triangles\n", mesh.quad_count, scene.triangle_count());
+    scene.build_lights(palette);
+    std::printf("greedy mesh: %u quads, %zu triangles, %s emissive lights\n", mesh.quad_count,
+                scene.triangle_count(), scene.has_lights() ? "has" : "no");
 
     core::Vec3 bmin, bmax;
     solid_bounds(chunk, bmin, bmax);
@@ -159,7 +168,7 @@ int main(int argc, char **argv) {
         render::PathSettings ps;
         ps.width = settings.width;
         ps.height = settings.height;
-        ps.spp = 256;
+        ps.spp = spp_override > 0 ? spp_override : 256;
         ps.max_depth = 6;
         ps.env_radiance = {0.6f, 0.72f, 0.92f}; // sky dome illuminates the scene
         if (fog) {
@@ -169,7 +178,9 @@ int main(int argc, char **argv) {
             ps.fog_inscatter = {0.62f, 0.74f, 0.94f}; // aerial-perspective haze color
             std::printf("homogeneous fog enabled (aerial perspective)\n");
         }
-        std::printf("path tracing: %d spp, max depth %d\n", ps.spp, ps.max_depth);
+        ps.next_event_estimation = nee;
+        std::printf("path tracing: %d spp, max depth %d%s\n", ps.spp, ps.max_depth,
+                    nee ? ", NEE+MIS" : "");
         fb = render::path_render(scene, cam, palette, ps, 1);
     } else {
         fb = render::render(scene, cam, palette, settings);

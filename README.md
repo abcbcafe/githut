@@ -78,7 +78,9 @@ cmake -S native/tools -B native/build-tools && cmake --build native/build-tools 
 ./native/build-tools/cpu_reference out.ppm             # direct sun + hard shadows
 ./native/build-tools/cpu_reference out.ppm --pt        # Monte Carlo path tracer (GI)
 ./native/build-tools/cpu_reference out.ppm --pt --fog  # + homogeneous "air" volumetrics
+./native/build-tools/cpu_reference out.ppm --pt --nee  # + next-event estimation (MIS)
 ./native/build-tools/cpu_reference out.ppm scene.vox   # or a MagicaVoxel model
+# (--spp=N overrides samples per pixel)
 ```
 
 It is BVH-accelerated and supports direct sun + hard shadows, a Monte Carlo **path integrator**

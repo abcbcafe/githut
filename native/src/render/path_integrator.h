@@ -32,6 +32,12 @@ struct PathSettings {
     bool medium_enabled = false;
     HomogeneousMedium medium;
     core::Vec3 fog_inscatter{0.0f, 0.0f, 0.0f};
+
+    // Next-event estimation: directly sample emissive voxels each bounce and combine
+    // with BSDF sampling via multiple importance sampling (balance heuristic). Same
+    // result as pure BSDF sampling in expectation, with much lower variance. Requires
+    // scene.build_lights() to have been called.
+    bool next_event_estimation = false;
 };
 
 // Estimate incoming radiance along a single primary ray. When out_primary_t is
@@ -40,6 +46,12 @@ struct PathSettings {
 core::Vec3 trace_path(const TriangleScene &scene, const voxel::MaterialPalette &palette,
                       core::Ray ray, core::Pcg32 &rng, int max_depth,
                       const core::Vec3 &env_radiance, float *out_primary_t = nullptr);
+
+// As trace_path, but with next-event estimation + MIS (balance heuristic) for the
+// scene's emissive area lights. Unbiased; lower variance than trace_path.
+core::Vec3 trace_path_nee(const TriangleScene &scene, const voxel::MaterialPalette &palette,
+                          core::Ray ray, core::Pcg32 &rng, int max_depth,
+                          const core::Vec3 &env_radiance, float *out_primary_t = nullptr);
 
 // Render a full framebuffer (row-major linear RGB). Deterministic for a given seed.
 std::vector<core::Vec3> path_render(const TriangleScene &scene, const PinholeCamera &camera,

@@ -24,6 +24,22 @@ struct Hit {
     voxel::MaterialId material = voxel::kAir;
 };
 
+// An emissive triangle treated as a one-sided area light (emits along its normal).
+struct AreaLight {
+    core::Triangle tri;
+    core::Vec3 normal;
+    core::Vec3 emission;
+    float area = 0.0f;
+};
+
+// A point sampled on the emissive surface, for next-event estimation.
+struct LightSample {
+    core::Vec3 point;
+    core::Vec3 normal;
+    core::Vec3 emission;
+    float pdf_area = 0.0f; // pdf w.r.t. surface area (uniform over total emissive area)
+};
+
 // A flat triangle soup with per-triangle normal + material, built from greedy mesh
 // output. Brute-force intersection is fine for coarse voxel scenes.
 class TriangleScene {
@@ -42,6 +58,14 @@ public:
     Hit brute_force_closest_hit(const core::Ray &ray) const;
     bool brute_force_any_hit(const core::Ray &ray, float max_t) const;
 
+    // Collect emissive triangles into an area-light list (needs the palette for
+    // emission). Call after add_mesh(); enables next-event estimation.
+    void build_lights(const voxel::MaterialPalette &palette);
+    bool has_lights() const { return !lights_.empty(); }
+    float total_emissive_area() const { return total_area_; }
+    // Sample a point uniformly over the total emissive area (light chosen ∝ area).
+    LightSample sample_light(float u_select, float u1, float u2) const;
+
     std::size_t triangle_count() const { return triangles_.size(); }
     bool has_bvh() const { return use_bvh_; }
 
@@ -54,6 +78,10 @@ private:
 
     Bvh bvh_;
     bool use_bvh_ = false;
+
+    std::vector<AreaLight> lights_;
+    std::vector<float> light_cdf_; // cumulative area, for area-weighted selection
+    float total_area_ = 0.0f;
 };
 
 struct RenderSettings {

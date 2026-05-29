@@ -28,6 +28,55 @@ void TriangleScene::build_bvh() {
     use_bvh_ = true;
 }
 
+void TriangleScene::build_lights(const voxel::MaterialPalette &palette) {
+    lights_.clear();
+    light_cdf_.clear();
+    total_area_ = 0.0f;
+    for (std::size_t i = 0; i < triangles_.size(); ++i) {
+        if (!palette.contains(materials_[i])) {
+            continue;
+        }
+        const voxel::PbrMaterial &mat = palette.get(materials_[i]);
+        if (!mat.is_emissive()) {
+            continue;
+        }
+        const Triangle &t = triangles_[i];
+        const float area = 0.5f * core::length(core::cross(t.b - t.a, t.c - t.a));
+        if (area <= 0.0f) {
+            continue;
+        }
+        total_area_ += area;
+        lights_.push_back(AreaLight{t, normals_[i],
+                                    {mat.emission[0], mat.emission[1], mat.emission[2]}, area});
+        light_cdf_.push_back(total_area_);
+    }
+}
+
+LightSample TriangleScene::sample_light(float u_select, float u1, float u2) const {
+    LightSample s;
+    if (lights_.empty() || total_area_ <= 0.0f) {
+        return s;
+    }
+    // Pick a light with probability proportional to its area.
+    const float target = u_select * total_area_;
+    std::size_t idx = 0;
+    while (idx + 1 < light_cdf_.size() && light_cdf_[idx] < target) {
+        ++idx;
+    }
+    const AreaLight &light = lights_[idx];
+
+    // Uniform barycentric point on the triangle.
+    const float su = std::sqrt(u1);
+    const float b0 = 1.0f - su;
+    const float b1 = u2 * su;
+    const float b2 = 1.0f - b0 - b1;
+    s.point = light.tri.a * b0 + light.tri.b * b1 + light.tri.c * b2;
+    s.normal = light.normal;
+    s.emission = light.emission;
+    s.pdf_area = 1.0f / total_area_; // area-weighted choice => uniform over total area
+    return s;
+}
+
 Hit TriangleScene::make_hit(int triangle_index, float t) const {
     Hit hit;
     hit.hit = true;

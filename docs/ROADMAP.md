@@ -24,6 +24,10 @@ accumulation, GGX PBR; load a glTF test mesh + materials.
 - [x] GGX microfacet **BSDF** module (NDF + Smith + Fresnel-Schlick + importance sampling),
   verified by NDF-normalization, Smith-bounds, Fresnel-endpoint, and single-scatter energy tests
   (`native/src/render/bsdf.h`). Ready to wire into the integrator/GPU.
+- [x] **Next-event estimation + MIS** (balance heuristic) sampling emissive voxels as area lights,
+  verified by equality-in-expectation against the BSDF-only path tracer and a variance-reduction
+  test (`trace_path_nee`, `TriangleScene::{build,sample}_light*`). This is the precursor to the
+  GPU ReSTIR DI work.
 - [ ] GPU: BLAS/TLAS + RT pipeline; primary-hit albedo; NEE shadows; temporal accumulation; GGX BSDF.
 
 ### Volumetrics ("air") — CPU groundwork

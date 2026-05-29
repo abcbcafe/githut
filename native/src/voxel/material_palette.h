@@ -23,6 +23,7 @@ struct PbrMaterial {
     // (per unit distance), giving tinted glass.
     float transmission = 0.0f;
     float ior = 1.5f;
+    float dispersion = 0.0f; // Cauchy B coefficient (um^2); >0 splits colors (prism)
     std::array<float, 3> attenuation{0.0f, 0.0f, 0.0f};
 
     // Per-band acoustic coefficients (reused by the geometric acoustic tracer).

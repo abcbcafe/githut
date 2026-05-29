@@ -23,19 +23,39 @@ Vec3 mat_emission(const voxel::PbrMaterial &m) {
     return {m.emission[0], m.emission[1], m.emission[2]};
 }
 
+// Per-channel index of refraction via Cauchy's equation n(λ) = A + B/λ², with the
+// green channel anchored to mat.ior. B = mat.dispersion; B > 0 makes blue bend more
+// than red (normal dispersion), which is what splits white light into a spectrum.
+float ior_for_channel(const voxel::PbrMaterial &mat, int channel) {
+    if (mat.dispersion == 0.0f) {
+        return mat.ior;
+    }
+    constexpr float lambda[3] = {0.620f, 0.540f, 0.460f}; // R, G, B (micrometres)
+    const float b = mat.dispersion;
+    const float a = mat.ior - b / (lambda[1] * lambda[1]); // anchor green to mat.ior
+    return a + b / (lambda[channel] * lambda[channel]);
+}
+
+// Throughput mask selecting a single hero channel (and weighting by 3 to undo the
+// 1/3 selection probability), used for spectral (dispersive) paths.
+Vec3 hero_mask(int channel) {
+    return {channel == 0 ? 3.0f : 0.0f, channel == 1 ? 3.0f : 0.0f, channel == 2 ? 3.0f : 0.0f};
+}
+
 // Dielectric (glass) scattering. d is the incoming ray direction (unit, into the
-// surface) and n_geo the outward geometric normal. A microfacet normal is sampled
-// from the GGX distribution (the geometric normal when roughness is 0, giving smooth
-// glass); the surface then stochastically reflects or refracts proportional to the
-// Fresnel reflectance (so the F term cancels). Applies the microfacet throughput
-// weight G*|d.m|/(|d.n|*|m.n|), the radiance-scaling (eta_i/eta_t)^2 on refraction,
-// toggles `inside`, and records the absorption coefficient when entering.
-Vec3 dielectric_bounce(const Vec3 &d, const Vec3 &n_geo, const voxel::PbrMaterial &mat,
+// surface) and n_geo the outward geometric normal. `ior` is the (possibly per-channel)
+// index of refraction to use. A microfacet normal is sampled from the GGX distribution
+// (the geometric normal when roughness is 0, giving smooth glass); the surface then
+// stochastically reflects or refracts proportional to the Fresnel reflectance (so the
+// F term cancels). Applies the microfacet throughput weight G*|d.m|/(|d.n|*|m.n|), the
+// radiance-scaling (eta_i/eta_t)^2 on refraction, toggles `inside`, and records the
+// absorption coefficient when entering.
+Vec3 dielectric_bounce(const Vec3 &d, const Vec3 &n_geo, const voxel::PbrMaterial &mat, float ior,
                        Pcg32 &rng, Vec3 &beta, bool &inside, Vec3 &glass_sigma) {
     const bool entering = core::dot(d, n_geo) < 0.0f;
     Vec3 ns = entering ? n_geo : -n_geo; // shading normal facing the incoming ray
     float eta_i = 1.0f;
-    float eta_t = mat.ior;
+    float eta_t = ior;
     if (!entering) {
         std::swap(eta_i, eta_t);
     }
@@ -113,6 +133,7 @@ Vec3 trace_path(const TriangleScene &scene, const voxel::MaterialPalette &palett
     Vec3 beta{1.0f, 1.0f, 1.0f}; // path throughput
     bool inside = false;         // traveling inside a glass medium?
     Vec3 glass_sigma{0.0f, 0.0f, 0.0f};
+    int hero = -1; // chosen spectral channel once a dispersive surface is hit (-1 = full RGB)
 
     for (int depth = 0; depth < max_depth; ++depth) {
         const Hit hit = scene.closest_hit(ray);
@@ -135,7 +156,15 @@ Vec3 trace_path(const TriangleScene &scene, const voxel::MaterialPalette &palett
         // Smooth dielectric (glass): specular reflect/refract.
         if (mat.is_glass()) {
             const Vec3 p = ray.origin + ray.dir * hit.t;
-            const Vec3 dir = dielectric_bounce(ray.dir, hit.normal, mat, rng, beta, inside,
+            float ior = mat.ior;
+            if (mat.dispersion != 0.0f && hero < 0) {
+                hero = std::min(2, static_cast<int>(rng.next_float() * 3.0f));
+                beta = mul(beta, hero_mask(hero)); // collapse this path to one wavelength
+            }
+            if (hero >= 0) {
+                ior = ior_for_channel(mat, hero);
+            }
+            const Vec3 dir = dielectric_bounce(ray.dir, hit.normal, mat, ior, rng, beta, inside,
                                                glass_sigma);
             if (depth >= 3) {
                 const float q = std::clamp(std::max({beta.x, beta.y, beta.z}), 0.0f, 0.95f);
@@ -188,6 +217,7 @@ Vec3 trace_path_nee(const TriangleScene &scene, const voxel::MaterialPalette &pa
     float prev_bsdf_pdf = 0.0f;
     bool inside = false; // traveling inside a glass medium?
     Vec3 glass_sigma{0.0f, 0.0f, 0.0f};
+    int hero = -1; // chosen spectral channel once a dispersive surface is hit (-1 = full RGB)
 
     for (int depth = 0; depth < max_depth; ++depth) {
         const Hit hit = scene.closest_hit(ray);
@@ -210,7 +240,15 @@ Vec3 trace_path_nee(const TriangleScene &scene, const voxel::MaterialPalette &pa
         // not apply, so the next emitter hit is counted in full.
         if (mat.is_glass()) {
             const Vec3 p = ray.origin + ray.dir * hit.t;
-            const Vec3 dir = dielectric_bounce(ray.dir, hit.normal, mat, rng, beta, inside,
+            float ior = mat.ior;
+            if (mat.dispersion != 0.0f && hero < 0) {
+                hero = std::min(2, static_cast<int>(rng.next_float() * 3.0f));
+                beta = mul(beta, hero_mask(hero)); // collapse this path to one wavelength
+            }
+            if (hero >= 0) {
+                ior = ior_for_channel(mat, hero);
+            }
+            const Vec3 dir = dielectric_bounce(ray.dir, hit.normal, mat, ior, rng, beta, inside,
                                                glass_sigma);
             if (depth >= 3) {
                 const float q = std::clamp(std::max({beta.x, beta.y, beta.z}), 0.0f, 0.95f);

@@ -33,7 +33,8 @@ void box(voxel::VoxelChunk &chunk, int x0, int y0, int z0, int x1, int y1, int z
     }
 }
 
-void build_demo(voxel::VoxelChunk &chunk, voxel::MaterialPalette &palette, bool glass_block) {
+void build_demo(voxel::VoxelChunk &chunk, voxel::MaterialPalette &palette, bool glass_block,
+                bool dispersion) {
     voxel::PbrMaterial floor;
     floor.albedo = {0.62f, 0.62f, 0.66f};
     const auto floor_id = palette.add(floor);
@@ -54,6 +55,10 @@ void build_demo(voxel::VoxelChunk &chunk, voxel::MaterialPalette &palette, bool 
         blue.ior = 1.5f;
         blue.roughness = 0.0f; // smooth, clear glass
         blue.attenuation = {0.05f, 0.02f, 0.08f}; // faint tint
+        if (dispersion) {
+            blue.attenuation = {0.0f, 0.0f, 0.0f}; // clear, so colors come only from dispersion
+            blue.dispersion = 0.05f;               // strong, prism-like
+        }
     }
     const auto blue_id = palette.add(blue);
 
@@ -134,6 +139,7 @@ int main(int argc, char **argv) {
     bool fog = false;
     bool nee = false;
     bool glass = false;
+    bool dispersion = false;
     int spp_override = -1;
     const char *vox_path = nullptr;
     for (int i = 2; i < argc; ++i) {
@@ -149,6 +155,10 @@ int main(int argc, char **argv) {
         } else if (arg == "--glass") {
             glass = true;
             path_trace = true; // glass needs the path tracer
+        } else if (arg == "--dispersion") {
+            glass = true;
+            dispersion = true;
+            path_trace = true;
         } else if (arg.rfind("--spp=", 0) == 0) {
             spp_override = std::atoi(arg.c_str() + 6);
         } else {
@@ -168,8 +178,9 @@ int main(int argc, char **argv) {
         voxel::populate_chunk(*scene, chunk, palette);
         std::printf("loaded %zu voxels from %s\n", scene->voxels.size(), vox_path);
     } else {
-        build_demo(chunk, palette, glass);
-        std::printf("rendering built-in demo scene%s\n", glass ? " (glass block)" : "");
+        build_demo(chunk, palette, glass, dispersion);
+        std::printf("rendering built-in demo scene%s%s\n", glass ? " (glass block)" : "",
+                    dispersion ? " (dispersion)" : "");
     }
 
     const voxel::MeshData mesh = voxel::greedy_mesh(chunk);

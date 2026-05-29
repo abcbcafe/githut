@@ -28,6 +28,10 @@ accumulation, GGX PBR; load a glTF test mesh + materials.
   verified by equality-in-expectation against the BSDF-only path tracer and a variance-reduction
   test (`trace_path_nee`, `TriangleScene::{build,sample}_light*`). This is the precursor to the
   GPU ReSTIR DI work.
+- [x] Smooth **dielectric glass**: Snell refraction, unpolarized Fresnel, total internal
+  reflection, radiance scaling across the boundary, and Beer–Lambert tint inside the glass
+  (`bsdf::{fresnel_dielectric,refract}`, `dielectric_bounce`). Verified by Snell/Fresnel/TIR unit
+  tests and integrator transmittance tests (`--glass`).
 - [ ] GPU: BLAS/TLAS + RT pipeline; primary-hit albedo; NEE shadows; temporal accumulation; GGX BSDF.
 
 ### Volumetrics ("air") — CPU groundwork

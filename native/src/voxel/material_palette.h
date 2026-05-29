@@ -17,6 +17,14 @@ struct PbrMaterial {
     float roughness = 0.8f;
     std::array<float, 3> emission{0.0f, 0.0f, 0.0f}; // emissive voxels act as area lights
 
+    // Dielectric (glass) parameters. transmission > 0 marks a smooth dielectric:
+    // the path tracer reflects/refracts by Fresnel using `ior`, and `attenuation`
+    // is the per-channel Beer-Lambert absorption coefficient inside the glass
+    // (per unit distance), giving tinted glass.
+    float transmission = 0.0f;
+    float ior = 1.5f;
+    std::array<float, 3> attenuation{0.0f, 0.0f, 0.0f};
+
     // Per-band acoustic coefficients (reused by the geometric acoustic tracer).
     // Three coarse bands: low / mid / high. Absorption in [0,1].
     std::array<float, 3> absorption{0.1f, 0.1f, 0.1f};
@@ -25,6 +33,7 @@ struct PbrMaterial {
     bool is_emissive() const {
         return emission[0] > 0.0f || emission[1] > 0.0f || emission[2] > 0.0f;
     }
+    bool is_glass() const { return transmission > 0.0f; }
 };
 
 // Maps voxel MaterialId -> PbrMaterial. Index 0 (air) is always present and unused

@@ -1,6 +1,9 @@
 #include "render/path_integrator.h"
 
 #include <algorithm>
+#include <cmath>
+
+#include "render/bsdf.h"
 
 namespace pathtracer::render {
 
@@ -16,12 +19,50 @@ Vec3 mat_albedo(const voxel::PbrMaterial &m) { return {m.albedo[0], m.albedo[1],
 Vec3 mat_emission(const voxel::PbrMaterial &m) {
     return {m.emission[0], m.emission[1], m.emission[2]};
 }
+
+// Smooth-dielectric (glass) scattering. d is the incoming ray direction (unit, into
+// the surface) and n_geo the outward geometric normal. Stochastically reflects or
+// refracts proportional to the Fresnel reflectance (so the throughput weight is 1),
+// applies the radiance-scaling factor (eta_i/eta_t)^2 on refraction, toggles the
+// `inside` flag, and records the glass absorption coefficient when entering. Returns
+// the outgoing ray direction.
+Vec3 dielectric_bounce(const Vec3 &d, const Vec3 &n_geo, const voxel::PbrMaterial &mat,
+                       Pcg32 &rng, Vec3 &beta, bool &inside, Vec3 &glass_sigma) {
+    const bool entering = core::dot(d, n_geo) < 0.0f;
+    Vec3 n = n_geo;
+    float eta_i = 1.0f;
+    float eta_t = mat.ior;
+    if (!entering) {
+        n = -n_geo; // face the incoming ray
+        std::swap(eta_i, eta_t);
+    }
+    const float cos_in = -core::dot(d, n); // > 0
+    const float fr = bsdf::fresnel_dielectric(cos_in, eta_i, eta_t);
+
+    Vec3 wt;
+    if (rng.next_float() < fr || !bsdf::refract(d, n, eta_i / eta_t, wt)) {
+        return bsdf::reflect_ray(d, n); // reflection (or TIR): no medium change
+    }
+    beta = beta * ((eta_i * eta_i) / (eta_t * eta_t)); // radiance scaling across the boundary
+    inside = !inside;
+    glass_sigma = entering ? Vec3{mat.attenuation[0], mat.attenuation[1], mat.attenuation[2]}
+                           : Vec3{0.0f, 0.0f, 0.0f};
+    return wt;
+}
+
+// Beer-Lambert attenuation over a segment of length `dist` inside a glass medium.
+Vec3 absorb(const Vec3 &beta, const Vec3 &sigma, float dist) {
+    return {beta.x * std::exp(-sigma.x * dist), beta.y * std::exp(-sigma.y * dist),
+            beta.z * std::exp(-sigma.z * dist)};
+}
 } // namespace
 
 Vec3 trace_path(const TriangleScene &scene, const voxel::MaterialPalette &palette, Ray ray,
                 Pcg32 &rng, int max_depth, const Vec3 &env_radiance, float *out_primary_t) {
     Vec3 radiance{0.0f, 0.0f, 0.0f};
     Vec3 beta{1.0f, 1.0f, 1.0f}; // path throughput
+    bool inside = false;         // traveling inside a glass medium?
+    Vec3 glass_sigma{0.0f, 0.0f, 0.0f};
 
     for (int depth = 0; depth < max_depth; ++depth) {
         const Hit hit = scene.closest_hit(ray);
@@ -33,8 +74,29 @@ Vec3 trace_path(const TriangleScene &scene, const voxel::MaterialPalette &palett
             break;
         }
 
+        // Beer-Lambert absorption over the segment just traveled inside glass.
+        if (inside) {
+            beta = absorb(beta, glass_sigma, hit.t);
+        }
+
         const voxel::PbrMaterial &mat =
                 palette.contains(hit.material) ? palette.get(hit.material) : voxel::PbrMaterial{};
+
+        // Smooth dielectric (glass): specular reflect/refract.
+        if (mat.is_glass()) {
+            const Vec3 p = ray.origin + ray.dir * hit.t;
+            const Vec3 dir = dielectric_bounce(ray.dir, hit.normal, mat, rng, beta, inside,
+                                               glass_sigma);
+            if (depth >= 3) {
+                const float q = std::clamp(std::max({beta.x, beta.y, beta.z}), 0.0f, 0.95f);
+                if (rng.next_float() > q) {
+                    break;
+                }
+                beta = beta * (1.0f / q);
+            }
+            ray = Ray{p + dir * 1e-3f, dir};
+            continue;
+        }
 
         radiance = radiance + mul(beta, mat_emission(mat));
 
@@ -74,6 +136,8 @@ Vec3 trace_path_nee(const TriangleScene &scene, const voxel::MaterialPalette &pa
 
     bool prev_specular = true; // camera ray has no light-sampling alternative
     float prev_bsdf_pdf = 0.0f;
+    bool inside = false; // traveling inside a glass medium?
+    Vec3 glass_sigma{0.0f, 0.0f, 0.0f};
 
     for (int depth = 0; depth < max_depth; ++depth) {
         const Hit hit = scene.closest_hit(ray);
@@ -85,8 +149,30 @@ Vec3 trace_path_nee(const TriangleScene &scene, const voxel::MaterialPalette &pa
             break;
         }
 
+        if (inside) {
+            beta = absorb(beta, glass_sigma, hit.t);
+        }
+
         const voxel::PbrMaterial &mat =
                 palette.contains(hit.material) ? palette.get(hit.material) : voxel::PbrMaterial{};
+
+        // Smooth dielectric (glass): specular reflect/refract; light sampling does
+        // not apply, so the next emitter hit is counted in full.
+        if (mat.is_glass()) {
+            const Vec3 p = ray.origin + ray.dir * hit.t;
+            const Vec3 dir = dielectric_bounce(ray.dir, hit.normal, mat, rng, beta, inside,
+                                               glass_sigma);
+            if (depth >= 3) {
+                const float q = std::clamp(std::max({beta.x, beta.y, beta.z}), 0.0f, 0.95f);
+                if (rng.next_float() > q) {
+                    break;
+                }
+                beta = beta * (1.0f / q);
+            }
+            prev_specular = true;
+            ray = Ray{p + dir * 1e-3f, dir};
+            continue;
+        }
 
         // Emitted radiance, MIS-weighted against the light-sampling strategy.
         const Vec3 emission = mat_emission(mat);

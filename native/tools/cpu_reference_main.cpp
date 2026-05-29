@@ -33,7 +33,7 @@ void box(voxel::VoxelChunk &chunk, int x0, int y0, int z0, int x1, int y1, int z
     }
 }
 
-void build_demo(voxel::VoxelChunk &chunk, voxel::MaterialPalette &palette) {
+void build_demo(voxel::VoxelChunk &chunk, voxel::MaterialPalette &palette, bool glass_block) {
     voxel::PbrMaterial floor;
     floor.albedo = {0.62f, 0.62f, 0.66f};
     const auto floor_id = palette.add(floor);
@@ -48,6 +48,12 @@ void build_demo(voxel::VoxelChunk &chunk, voxel::MaterialPalette &palette) {
 
     voxel::PbrMaterial blue;
     blue.albedo = {0.20f, 0.36f, 0.86f};
+    if (glass_block) {
+        blue.albedo = {0.0f, 0.0f, 0.0f};
+        blue.transmission = 1.0f;
+        blue.ior = 1.5f;
+        blue.attenuation = {0.05f, 0.02f, 0.08f}; // faint tint
+    }
     const auto blue_id = palette.add(blue);
 
     voxel::PbrMaterial lamp;
@@ -105,6 +111,7 @@ int main(int argc, char **argv) {
     bool path_trace = false;
     bool fog = false;
     bool nee = false;
+    bool glass = false;
     int spp_override = -1;
     const char *vox_path = nullptr;
     for (int i = 2; i < argc; ++i) {
@@ -117,6 +124,9 @@ int main(int argc, char **argv) {
         } else if (arg == "--nee") {
             nee = true;
             path_trace = true;
+        } else if (arg == "--glass") {
+            glass = true;
+            path_trace = true; // glass needs the path tracer
         } else if (arg.rfind("--spp=", 0) == 0) {
             spp_override = std::atoi(arg.c_str() + 6);
         } else {
@@ -136,8 +146,8 @@ int main(int argc, char **argv) {
         voxel::populate_chunk(*scene, chunk, palette);
         std::printf("loaded %zu voxels from %s\n", scene->voxels.size(), vox_path);
     } else {
-        build_demo(chunk, palette);
-        std::printf("rendering built-in demo scene\n");
+        build_demo(chunk, palette, glass);
+        std::printf("rendering built-in demo scene%s\n", glass ? " (glass block)" : "");
     }
 
     const voxel::MeshData mesh = voxel::greedy_mesh(chunk);

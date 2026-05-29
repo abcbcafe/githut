@@ -8,6 +8,7 @@
 // BaseMaterial3D and back the GPU closest-hit shader. GPU-free and unit-tested
 // (NDF normalization, Smith bounds, Fresnel endpoints, single-scatter energy).
 
+#include <algorithm>
 #include <cmath>
 
 #include "core/math.h"
@@ -47,6 +48,40 @@ inline core::Vec3 fresnel_schlick(float cos_theta, const core::Vec3 &f0) {
 
 inline core::Vec3 reflect(const core::Vec3 &v, const core::Vec3 &n) {
     return n * (2.0f * core::dot(v, n)) - v;
+}
+
+// Reflect a ray direction d (pointing *into* the surface) about normal n.
+inline core::Vec3 reflect_ray(const core::Vec3 &d, const core::Vec3 &n) {
+    return d - n * (2.0f * core::dot(d, n));
+}
+
+// Unpolarized Fresnel reflectance at a smooth dielectric interface. cos_i is the
+// (positive) cosine of the incidence angle; eta_i / eta_t are the IORs on the
+// incident / transmitted sides. Returns 1 on total internal reflection.
+inline float fresnel_dielectric(float cos_i, float eta_i, float eta_t) {
+    cos_i = std::clamp(cos_i, 0.0f, 1.0f);
+    const float sin_i = std::sqrt(std::fmax(0.0f, 1.0f - cos_i * cos_i));
+    const float sin_t = eta_i / eta_t * sin_i;
+    if (sin_t >= 1.0f) {
+        return 1.0f; // total internal reflection
+    }
+    const float cos_t = std::sqrt(std::fmax(0.0f, 1.0f - sin_t * sin_t));
+    const float r_parl = (eta_t * cos_i - eta_i * cos_t) / (eta_t * cos_i + eta_i * cos_t);
+    const float r_perp = (eta_i * cos_i - eta_t * cos_t) / (eta_i * cos_i + eta_t * cos_t);
+    return 0.5f * (r_parl * r_parl + r_perp * r_perp);
+}
+
+// Snell's-law refraction of a ray direction d (unit, pointing into the surface)
+// across normal n (unit, on the incident side so dot(d, n) < 0), with relative
+// index eta = eta_i / eta_t. Returns false on total internal reflection.
+inline bool refract(const core::Vec3 &d, const core::Vec3 &n, float eta, core::Vec3 &out) {
+    const float cos_i = core::dot(d, n); // < 0
+    const float k = 1.0f - eta * eta * (1.0f - cos_i * cos_i);
+    if (k < 0.0f) {
+        return false;
+    }
+    out = d * eta - n * (eta * cos_i + std::sqrt(k));
+    return true;
 }
 
 // Microfacet reflection BRDF value for wo, wi in the local frame (z up, both in the

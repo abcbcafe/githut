@@ -79,18 +79,21 @@ cmake -S native/tools -B native/build-tools && cmake --build native/build-tools 
 ./native/build-tools/cpu_reference out.ppm --pt        # Monte Carlo path tracer (GI)
 ./native/build-tools/cpu_reference out.ppm --pt --fog  # + homogeneous "air" volumetrics
 ./native/build-tools/cpu_reference out.ppm --pt --nee  # + next-event estimation (MIS)
+./native/build-tools/cpu_reference out.ppm --pt --glass # central block becomes glass
 ./native/build-tools/cpu_reference out.ppm scene.vox   # or a MagicaVoxel model
-# (--spp=N overrides samples per pixel)
+# (--spp=N overrides samples per pixel; flags combine, e.g. --pt --nee --glass)
 ```
 
 It is BVH-accelerated and supports direct sun + hard shadows, a Monte Carlo **path integrator**
-(cosine-importance-sampled diffuse GI with Russian roulette), and homogeneous **volumetric "air"**
-(Beer–Lambert distance fog / aerial perspective). The GI is verified by white-furnace
-energy-conservation tests and the fog by Beer–Lambert transmittance tests.
+(cosine-importance-sampled diffuse GI, **GGX** specular, **next-event estimation + MIS**),
+homogeneous **volumetric "air"** (Beer–Lambert distance fog / aerial perspective), and smooth
+**dielectric glass** (Snell refraction, Fresnel, total internal reflection, tinted via
+Beer–Lambert). The GI is verified by white-furnace energy-conservation tests, the fog and glass by
+Beer–Lambert transmittance tests, and refraction by Snell/Fresnel/TIR unit tests.
 
-| Direct lighting | Path-traced GI | + volumetric air |
-|---|---|---|
-| ![direct](docs/images/cpu_reference_demo.png) | ![gi](docs/images/cpu_reference_pt.png) | ![fog](docs/images/cpu_reference_fog.png) |
+| Direct lighting | Path-traced GI | Volumetric air | Glass (refraction) |
+|---|---|---|---|
+| ![direct](docs/images/cpu_reference_demo.png) | ![gi](docs/images/cpu_reference_pt.png) | ![fog](docs/images/cpu_reference_fog.png) | ![glass](docs/images/cpu_reference_glass.png) |
 
 The full native GDExtension (godot-cpp + Vulkan + RTX) is built separately on a Vulkan-capable
 workstation; see [`docs/BUILD.md`](./docs/BUILD.md). CI gates the CPU-core tests

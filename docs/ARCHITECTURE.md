@@ -74,7 +74,8 @@ texture each frame (correct but slow — acceptable since performance is not an 
   ReSTIR DI direct lighting → ReSTIR GI indirect; `ray_query` in compute for visibility rays.
 - Ordering: temporal accumulation → ReSTIR DI → OIDN denoise → ReSTIR GI.
 - BSDF: metallic-roughness PBR (GGX + multiscatter, Lambertian/Oren-Nayar, Fresnel-Schlick),
-  1:1 with Godot `BaseMaterial3D`. Glass/transmission deferred.
+  1:1 with Godot `BaseMaterial3D`, plus smooth dielectric **glass** (Snell refraction, Fresnel,
+  TIR, Beer–Lambert tint) — prototyped and tested on CPU in `bsdf.h` / the path integrator.
 - Lights: analytic sun + procedural sky; emissive triangles as area lights; explicit point/spot.
 - **Volumetrics ("air"):** a homogeneous participating medium (per-channel absorption/scattering +
   Henyey–Greenstein phase). The CPU reference starts with exact Beer–Lambert distance fog / aerial

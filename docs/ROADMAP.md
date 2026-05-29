@@ -41,6 +41,9 @@ accumulation, GGX PBR; load a glTF test mesh + materials.
 - [x] Analytic **sphere** primitive in the reference renderer (exact ray/sphere intersection),
   alongside the triangle BVH — for smooth glass spheres in test/demo scenes (the game world stays
   triangle/voxel-based on the GPU).
+- [x] **Caustics** via forward photon (light) tracing: photons refract through glass and deposit
+  flux into a floor caustic map the camera pass reads (`render/caustics`). Verified by a focusing
+  test (peak >> mean) and an energy bound (deposited <= emitted). `--caustics`.
 - [ ] GPU: BLAS/TLAS + RT pipeline; primary-hit albedo; NEE shadows; temporal accumulation; GGX BSDF.
 
 ### Volumetrics ("air") — CPU groundwork

@@ -81,6 +81,7 @@ cmake -S native/tools -B native/build-tools && cmake --build native/build-tools 
 ./native/build-tools/cpu_reference out.ppm --pt --nee  # + next-event estimation (MIS)
 ./native/build-tools/cpu_reference out.ppm --pt --glass # central block becomes glass
 ./native/build-tools/cpu_reference out.ppm --pt --dispersion # prism: wavelength-split glass
+./native/build-tools/cpu_reference out.ppm --caustics   # glass-sphere caustic (photon tracing)
 ./native/build-tools/cpu_reference out.ppm scene.vox   # or a MagicaVoxel model
 # (--spp=N overrides samples per pixel; flags combine, e.g. --pt --nee --glass)
 ```
@@ -98,9 +99,9 @@ and refraction/dispersion by Snell/Fresnel/TIR and Cauchy/chromatic-separation u
 |---|---|---|
 | ![direct](docs/images/cpu_reference_demo.png) | ![gi](docs/images/cpu_reference_pt.png) | ![fog](docs/images/cpu_reference_fog.png) |
 
-| Glass (spheres + cube) | Chromatic dispersion |
-|---|---|
-| ![glass](docs/images/cpu_reference_glass.png) | ![dispersion](docs/images/cpu_reference_dispersion.png) |
+| Glass (spheres + cube) | Chromatic dispersion | Glass-sphere caustic |
+|---|---|---|
+| ![glass](docs/images/cpu_reference_glass.png) | ![dispersion](docs/images/cpu_reference_dispersion.png) | ![caustic](docs/images/cpu_reference_caustic.png) |
 
 The full native GDExtension (godot-cpp + Vulkan + RTX) is built separately on a Vulkan-capable
 workstation; see [`docs/BUILD.md`](./docs/BUILD.md). CI gates the CPU-core tests

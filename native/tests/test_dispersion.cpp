@@ -116,6 +116,41 @@ TEST_CASE("dispersion introduces chromatic separation that is absent without it"
     CHECK(chroma_disp > chroma_clear * 5.0 + 1.0);
 }
 
+TEST_CASE("frosted + prismatic: rough dispersive glass both blurs and splits colors") {
+    auto build = [](voxel::MaterialPalette &palette, float dispersion) {
+        voxel::PbrMaterial wall;
+        wall.emission = {1.0f, 1.0f, 1.0f};
+        const auto wall_id = palette.add(wall);
+        voxel::PbrMaterial glass;
+        glass.transmission = 1.0f;
+        glass.ior = 1.5f;
+        glass.roughness = 0.3f; // frosted
+        glass.dispersion = dispersion;
+        const auto glass_id = palette.add(glass);
+        voxel::VoxelChunk chunk;
+        box(chunk, 0, 0, 0, 11, 11, 0, wall_id);
+        box(chunk, 3, 3, 5, 8, 8, 5, glass_id);
+        TriangleScene scene;
+        scene.add_mesh(voxel::greedy_mesh(chunk));
+        scene.build_bvh();
+        return scene;
+    };
+
+    PinholeCamera cam({5.5f, 5.5f, 11.0f}, {0, 0, -1}, {0, 1, 0}, 0.9f, 1.0f);
+    PathSettings s;
+    s.width = 64;
+    s.height = 64;
+    s.spp = 256;
+    s.max_depth = 8;
+    s.env_radiance = {0.0f, 0.0f, 0.0f};
+
+    voxel::MaterialPalette p0, p1;
+    const double chroma_plain = chroma_sum(path_render(build(p0, 0.0f), cam, p0, s, 1));
+    const double chroma_disp = chroma_sum(path_render(build(p1, 0.02f), cam, p1, s, 1));
+    // Frosted glass with dispersion still separates colors well beyond frosted-only.
+    CHECK(chroma_disp > chroma_plain * 2.0 + 1.0);
+}
+
 TEST_CASE("dispersive glass still conserves energy (furnace bound)") {
     voxel::MaterialPalette palette;
     voxel::PbrMaterial glass;

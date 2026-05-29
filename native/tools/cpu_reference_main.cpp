@@ -191,6 +191,30 @@ int main(int argc, char **argv) {
     std::printf("greedy mesh: %u quads, %zu triangles, %s emissive lights\n", mesh.quad_count,
                 scene.triangle_count(), scene.has_lights() ? "has" : "no");
 
+    // Two analytic glass spheres for the demo: a smooth clear one and a frosted one
+    // (both prismatic when --dispersion is set).
+    if (vox_path == nullptr && glass) {
+        voxel::PbrMaterial clear_s;
+        clear_s.transmission = 1.0f;
+        clear_s.ior = 1.5f;
+        clear_s.roughness = 0.0f;
+        if (dispersion) {
+            clear_s.dispersion = 0.05f;
+        }
+        scene.add_sphere({6.0f, 4.0f, 11.0f}, 2.8f, palette.add(clear_s));
+
+        voxel::PbrMaterial frosted_s;
+        frosted_s.transmission = 1.0f;
+        frosted_s.ior = 1.5f;
+        frosted_s.roughness = 0.28f; // frosted
+        if (dispersion) {
+            frosted_s.dispersion = 0.05f; // frosted + prismatic
+        }
+        scene.add_sphere({15.0f, 4.0f, 12.0f}, 2.8f, palette.add(frosted_s));
+        std::printf("added 2 glass spheres (clear + frosted%s)\n",
+                    dispersion ? ", both prismatic" : "");
+    }
+
     core::Vec3 bmin, bmax;
     solid_bounds(chunk, bmin, bmax);
     const core::Vec3 center{(bmin.x + bmax.x) * 0.5f, (bmin.y + bmax.y) * 0.5f,

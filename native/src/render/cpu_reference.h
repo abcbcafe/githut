@@ -40,14 +40,24 @@ struct LightSample {
     float pdf_area = 0.0f; // pdf w.r.t. surface area (uniform over total emissive area)
 };
 
+// An analytic sphere primitive. Useful for smooth glass spheres in the reference
+// renderer (the voxel world itself stays triangle-based).
+struct Sphere {
+    core::Vec3 center;
+    float radius = 1.0f;
+    voxel::MaterialId material = voxel::kAir;
+};
+
 // A flat triangle soup with per-triangle normal + material, built from greedy mesh
-// output. Brute-force intersection is fine for coarse voxel scenes.
+// output, plus optional analytic spheres. Brute-force intersection is fine for
+// coarse voxel scenes.
 class TriangleScene {
 public:
     void add_mesh(const voxel::MeshData &mesh);
+    void add_sphere(const core::Vec3 &center, float radius, voxel::MaterialId material);
 
     // Build the BVH over the current triangles; afterwards closest_hit/any_hit use
-    // it. Call once after all meshes are added.
+    // it. Call once after all meshes are added. Spheres are always brute-forced.
     void build_bvh();
 
     // Use the BVH when built, otherwise brute force. Results are identical.
@@ -71,6 +81,8 @@ public:
 
 private:
     Hit make_hit(int triangle_index, float t) const;
+    void intersect_spheres(const core::Ray &ray, Hit &best) const;
+    bool any_sphere_hit(const core::Ray &ray, float max_t) const;
 
     std::vector<core::Triangle> triangles_;
     std::vector<core::Vec3> normals_;
@@ -78,6 +90,8 @@ private:
 
     Bvh bvh_;
     bool use_bvh_ = false;
+
+    std::vector<Sphere> spheres_;
 
     std::vector<AreaLight> lights_;
     std::vector<float> light_cdf_; // cumulative area, for area-weighted selection

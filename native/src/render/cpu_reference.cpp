@@ -4,12 +4,32 @@
 #include <cmath>
 #include <fstream>
 #include <limits>
+#include <optional>
 
 namespace pathtracer::render {
 
 using core::Ray;
 using core::Triangle;
 using core::Vec3;
+
+namespace {
+// Nearest ray/sphere intersection distance > epsilon, or nullopt.
+std::optional<float> intersect_sphere(const Ray &ray, const Sphere &s, float epsilon = 1e-4f) {
+    const Vec3 oc = ray.origin - s.center;
+    const float b = core::dot(oc, ray.dir); // a == 1 (dir is unit length)
+    const float c = core::dot(oc, oc) - s.radius * s.radius;
+    const float disc = b * b - c;
+    if (disc < 0.0f) {
+        return std::nullopt;
+    }
+    const float sq = std::sqrt(disc);
+    float t = -b - sq;
+    if (t <= epsilon) {
+        t = -b + sq; // origin is inside (or first root behind): take the far root
+    }
+    return t > epsilon ? std::optional<float>(t) : std::nullopt;
+}
+} // namespace
 
 void TriangleScene::add_mesh(const voxel::MeshData &mesh) {
     for (std::size_t i = 0; i + 2 < mesh.indices.size(); i += 3) {
@@ -21,6 +41,10 @@ void TriangleScene::add_mesh(const voxel::MeshData &mesh) {
         normals_.push_back(Vec3{a.nx, a.ny, a.nz});
         materials_.push_back(a.material);
     }
+}
+
+void TriangleScene::add_sphere(const Vec3 &center, float radius, voxel::MaterialId material) {
+    spheres_.push_back(Sphere{center, radius, material});
 }
 
 void TriangleScene::build_bvh() {
@@ -86,16 +110,45 @@ Hit TriangleScene::make_hit(int triangle_index, float t) const {
     return hit;
 }
 
+void TriangleScene::intersect_spheres(const Ray &ray, Hit &best) const {
+    float closest = best.hit ? best.t : std::numeric_limits<float>::max();
+    for (const Sphere &s : spheres_) {
+        const auto t = intersect_sphere(ray, s);
+        if (t && *t < closest) {
+            closest = *t;
+            best.hit = true;
+            best.t = *t;
+            best.normal = core::normalize((ray.origin + ray.dir * (*t)) - s.center);
+            best.material = s.material;
+        }
+    }
+}
+
+bool TriangleScene::any_sphere_hit(const Ray &ray, float max_t) const {
+    for (const Sphere &s : spheres_) {
+        const auto t = intersect_sphere(ray, s);
+        if (t && *t < max_t) {
+            return true;
+        }
+    }
+    return false;
+}
+
 Hit TriangleScene::closest_hit(const Ray &ray) const {
-    if (use_bvh_) {
+    Hit best = use_bvh_ ? [&] {
         const Bvh::Hit h = bvh_.closest(ray);
         return h.hit ? make_hit(h.index, h.t) : Hit{};
-    }
-    return brute_force_closest_hit(ray);
+    }()
+                        : brute_force_closest_hit(ray);
+    intersect_spheres(ray, best);
+    return best;
 }
 
 bool TriangleScene::any_hit(const Ray &ray, float max_t) const {
-    return use_bvh_ ? bvh_.any(ray, max_t) : brute_force_any_hit(ray, max_t);
+    if (use_bvh_ ? bvh_.any(ray, max_t) : brute_force_any_hit(ray, max_t)) {
+        return true;
+    }
+    return any_sphere_hit(ray, max_t);
 }
 
 Hit TriangleScene::brute_force_closest_hit(const Ray &ray) const {

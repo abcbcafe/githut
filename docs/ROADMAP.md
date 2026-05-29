@@ -18,7 +18,10 @@ accumulation, GGX PBR; load a glTF test mesh + materials.
 - [x] CPU math core: `Vec3`, `Ray`, `Aabb`, Möller–Trumbore ray/triangle, ray/AABB slab test
   (`native/src/core/math.h`) — reused by the renderer and the acoustic tracer.
 - [x] `PinholeCamera` primary-ray generation (matches the planned raygen math), unit-tested.
-- [ ] BLAS/TLAS + RT pipeline; primary-hit albedo; NEE shadows; temporal accumulation; GGX BSDF.
+- [x] CPU BVH (analogue of the GPU BLAS), verified against brute force; PCG RNG + cosine
+  hemisphere sampling; Monte Carlo diffuse **path integrator** with Russian roulette, verified by
+  white-furnace energy-conservation tests (`native/src/render/{bvh,path_integrator}.cpp`).
+- [ ] GPU: BLAS/TLAS + RT pipeline; primary-hit albedo; NEE shadows; temporal accumulation; GGX BSDF.
 - **Deliverable:** a static PBR scene converging cleanly via accumulation, camera fly-through.
 
 ## M2 — Voxel world

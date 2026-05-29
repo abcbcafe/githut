@@ -10,6 +10,7 @@
 #include <vector>
 
 #include "core/math.h"
+#include "render/bvh.h"
 #include "render/camera.h"
 #include "voxel/material_palette.h"
 #include "voxel/mesh_data.h"
@@ -28,14 +29,31 @@ struct Hit {
 class TriangleScene {
 public:
     void add_mesh(const voxel::MeshData &mesh);
+
+    // Build the BVH over the current triangles; afterwards closest_hit/any_hit use
+    // it. Call once after all meshes are added.
+    void build_bvh();
+
+    // Use the BVH when built, otherwise brute force. Results are identical.
     Hit closest_hit(const core::Ray &ray) const;
     bool any_hit(const core::Ray &ray, float max_t) const; // shadow rays
+
+    // Reference implementations, kept for testing the BVH for equivalence.
+    Hit brute_force_closest_hit(const core::Ray &ray) const;
+    bool brute_force_any_hit(const core::Ray &ray, float max_t) const;
+
     std::size_t triangle_count() const { return triangles_.size(); }
+    bool has_bvh() const { return use_bvh_; }
 
 private:
+    Hit make_hit(int triangle_index, float t) const;
+
     std::vector<core::Triangle> triangles_;
     std::vector<core::Vec3> normals_;
     std::vector<voxel::MaterialId> materials_;
+
+    Bvh bvh_;
+    bool use_bvh_ = false;
 };
 
 struct RenderSettings {

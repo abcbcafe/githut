@@ -13,6 +13,7 @@
 #include "core/math.h"
 #include "render/camera.h"
 #include "render/cpu_reference.h"
+#include "render/path_integrator.h"
 #include "voxel/greedy_mesher.h"
 #include "voxel/material_palette.h"
 #include "voxel/vox_loader.h"
@@ -92,22 +93,37 @@ void solid_bounds(const voxel::VoxelChunk &chunk, core::Vec3 &min_out, core::Vec
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        std::fprintf(stderr, "usage: %s <out.ppm> [scene.vox]\n", argv[0]);
+        std::fprintf(stderr,
+                     "usage: %s <out.ppm> [scene.vox] [--pt]\n"
+                     "  --pt   Monte Carlo path tracer (global illumination) instead of\n"
+                     "         direct sun + hard shadows\n",
+                     argv[0]);
         return 2;
     }
     const std::string out_path = argv[1];
 
+    bool path_trace = false;
+    const char *vox_path = nullptr;
+    for (int i = 2; i < argc; ++i) {
+        const std::string arg = argv[i];
+        if (arg == "--pt") {
+            path_trace = true;
+        } else {
+            vox_path = argv[i];
+        }
+    }
+
     voxel::VoxelChunk chunk;
     voxel::MaterialPalette palette;
 
-    if (argc >= 3) {
-        const auto scene = voxel::load_vox_file(argv[2]);
+    if (vox_path != nullptr) {
+        const auto scene = voxel::load_vox_file(vox_path);
         if (!scene) {
-            std::fprintf(stderr, "failed to load .vox: %s\n", argv[2]);
+            std::fprintf(stderr, "failed to load .vox: %s\n", vox_path);
             return 1;
         }
         voxel::populate_chunk(*scene, chunk, palette);
-        std::printf("loaded %zu voxels from %s\n", scene->voxels.size(), argv[2]);
+        std::printf("loaded %zu voxels from %s\n", scene->voxels.size(), vox_path);
     } else {
         build_demo(chunk, palette);
         std::printf("rendering built-in demo scene\n");
@@ -116,6 +132,7 @@ int main(int argc, char **argv) {
     const voxel::MeshData mesh = voxel::greedy_mesh(chunk);
     render::TriangleScene scene;
     scene.add_mesh(mesh);
+    scene.build_bvh();
     std::printf("greedy mesh: %u quads, %zu triangles\n", mesh.quad_count, scene.triangle_count());
 
     core::Vec3 bmin, bmax;
@@ -133,7 +150,20 @@ int main(int argc, char **argv) {
     const core::Vec3 eye{center.x, center.y + extent * 0.6f, bmax.z + extent * 1.8f};
     render::PinholeCamera cam(eye, center - eye, {0, 1, 0}, 0.7f, aspect);
 
-    const auto fb = render::render(scene, cam, palette, settings);
+    std::vector<core::Vec3> fb;
+    if (path_trace) {
+        render::PathSettings ps;
+        ps.width = settings.width;
+        ps.height = settings.height;
+        ps.spp = 256;
+        ps.max_depth = 6;
+        ps.env_radiance = {0.6f, 0.72f, 0.92f}; // sky dome illuminates the scene
+        std::printf("path tracing: %d spp, max depth %d\n", ps.spp, ps.max_depth);
+        fb = render::path_render(scene, cam, palette, ps, 1);
+    } else {
+        fb = render::render(scene, cam, palette, settings);
+    }
+
     if (!render::write_ppm(out_path, fb, settings.width, settings.height)) {
         std::fprintf(stderr, "failed to write %s\n", out_path.c_str());
         return 1;

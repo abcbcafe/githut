@@ -23,23 +23,46 @@ void TriangleScene::add_mesh(const voxel::MeshData &mesh) {
     }
 }
 
+void TriangleScene::build_bvh() {
+    bvh_.build(triangles_);
+    use_bvh_ = true;
+}
+
+Hit TriangleScene::make_hit(int triangle_index, float t) const {
+    Hit hit;
+    hit.hit = true;
+    hit.t = t;
+    hit.normal = normals_[triangle_index];
+    hit.material = materials_[triangle_index];
+    return hit;
+}
+
 Hit TriangleScene::closest_hit(const Ray &ray) const {
+    if (use_bvh_) {
+        const Bvh::Hit h = bvh_.closest(ray);
+        return h.hit ? make_hit(h.index, h.t) : Hit{};
+    }
+    return brute_force_closest_hit(ray);
+}
+
+bool TriangleScene::any_hit(const Ray &ray, float max_t) const {
+    return use_bvh_ ? bvh_.any(ray, max_t) : brute_force_any_hit(ray, max_t);
+}
+
+Hit TriangleScene::brute_force_closest_hit(const Ray &ray) const {
     Hit best;
     float closest = std::numeric_limits<float>::max();
     for (std::size_t i = 0; i < triangles_.size(); ++i) {
         const auto t = core::intersect(ray, triangles_[i]);
         if (t && *t < closest) {
             closest = *t;
-            best.hit = true;
-            best.t = *t;
-            best.normal = normals_[i];
-            best.material = materials_[i];
+            best = make_hit(static_cast<int>(i), *t);
         }
     }
     return best;
 }
 
-bool TriangleScene::any_hit(const Ray &ray, float max_t) const {
+bool TriangleScene::brute_force_any_hit(const Ray &ray, float max_t) const {
     for (const Triangle &tri : triangles_) {
         const auto t = core::intersect(ray, tri);
         if (t && *t < max_t) {

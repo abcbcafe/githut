@@ -17,7 +17,9 @@ add_executable(cpu_reference
     cpu_reference_main.cpp
     "${SRC_DIR}/voxel/greedy_mesher.cpp"
     "${SRC_DIR}/voxel/vox_loader.cpp"
-    "${SRC_DIR}/render/cpu_reference.cpp")
+    "${SRC_DIR}/render/cpu_reference.cpp"
+    "${SRC_DIR}/render/bvh.cpp"
+    "${SRC_DIR}/render/path_integrator.cpp")
 
 target_include_directories(cpu_reference PRIVATE "${SRC_DIR}")
 

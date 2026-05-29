@@ -69,6 +69,18 @@ with **doctest** and runs without a GPU or the Vulkan SDK — including in CI:
 ./scripts/run_tests.sh          # configure + build + ctest
 ```
 
+There is also a **CPU reference path tracer** (`native/tools/cpu_reference`) that meshes a voxel
+scene and renders it with the same math the GPU path tracer will use — its output is the golden
+image for verification:
+
+```bash
+cmake -S native/tools -B native/build-tools && cmake --build native/build-tools -j
+./native/build-tools/cpu_reference out.ppm        # built-in demo scene
+./native/build-tools/cpu_reference out.ppm a.vox  # or a MagicaVoxel model
+```
+
+![CPU reference render](docs/images/cpu_reference_demo.png)
+
 The full native GDExtension (godot-cpp + Vulkan + RTX) is built separately on a Vulkan-capable
 workstation; see [`docs/BUILD.md`](./docs/BUILD.md). CI gates the CPU-core tests
 (`.github/workflows/ci.yml`).

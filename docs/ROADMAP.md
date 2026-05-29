@@ -59,7 +59,9 @@ geometry, live path-traced editor viewport.
 - **M0:** run project; RT texture animates with no validation errors (`VK_LAYER_KHRONOS_validation`
   on in debug) and no tearing under the UI.
 - **Per-milestone smoke scene** under `game/scenes/` exercising that milestone's feature.
-- **Renderer correctness:** offline high-spp golden image vs. 1 spp + denoise per smoke scene.
+- **Renderer correctness:** the CPU reference path tracer (`native/tools/cpu_reference`, already
+  available) produces golden images from the same voxel/material data; compare against the GPU
+  path tracer's 1 spp + denoise per smoke scene.
 - **Skinning:** toggle animation; confirm shadows/GI track the mesh; no topology-change asserts.
 - **Audio:** A/B room with vs. without walls; occlusion + reverb-tail length scale with room size;
   binaural localization check with a moving source.

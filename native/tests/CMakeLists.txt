@@ -23,9 +23,11 @@ add_executable(pathtracer_tests
     test_greedy_mesher.cpp
     test_math.cpp
     test_vox_loader.cpp
+    test_cpu_reference.cpp
     # CPU core under test (must stay free of Godot/Vulkan includes):
     "${SRC_DIR}/voxel/greedy_mesher.cpp"
-    "${SRC_DIR}/voxel/vox_loader.cpp")
+    "${SRC_DIR}/voxel/vox_loader.cpp"
+    "${SRC_DIR}/render/cpu_reference.cpp")
 
 target_include_directories(pathtracer_tests PRIVATE
     "${SRC_DIR}"

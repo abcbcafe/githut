@@ -20,6 +20,13 @@ jobs:
       - name: Build and run unit tests
         run: ./scripts/run_tests.sh
 
+      - name: Build CPU reference renderer + smoke render
+        run: |
+          cmake -S native/tools -B native/build-tools
+          cmake --build native/build-tools -j
+          ./native/build-tools/cpu_reference /tmp/ci_demo.ppm
+          test -s /tmp/ci_demo.ppm
+
   # The full native GDExtension build (godot-cpp + Vulkan SDK + RTX) cannot run on
   # a standard GitHub runner, so it is intentionally not gated here. See
   # docs/BUILD.md for building and running it on a Vulkan-capable workstation.

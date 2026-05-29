@@ -1,6 +1,6 @@
 # ---- Native GDExtension build artifacts ----
 native/build/
-native/build-tests/
+native/build-*/
 native/cmake-build-*/
 *.o
 *.obj

@@ -60,6 +60,19 @@ cmake --build native/build -j
 # then open game/project.godot in Godot 4.6
 ```
 
+## Testing
+
+The renderer-agnostic CPU core (voxel engine, greedy mesher, material palette) is unit-tested
+with **doctest** and runs without a GPU or the Vulkan SDK — including in CI:
+
+```bash
+./scripts/run_tests.sh          # configure + build + ctest
+```
+
+The full native GDExtension (godot-cpp + Vulkan + RTX) is built separately on a Vulkan-capable
+workstation; see [`docs/BUILD.md`](./docs/BUILD.md). CI gates the CPU-core tests
+(`.github/workflows/ci.yml`).
+
 ## License
 
 MIT — see [`LICENCE`](./LICENCE).

@@ -20,6 +20,11 @@ accumulation, GGX PBR; load a glTF test mesh + materials.
 ## M2 — Voxel world
 Chunk data, greedy mesh → BLAS, `.vox` import, material palette, Jolt collider per chunk, many
 TLAS chunk instances.
+- [x] CPU core: `VoxelChunk` (dense 32³), `MaterialPalette`, greedy mesher → `MeshData`.
+- [x] Unit tests (doctest) covering meshing invariants, face merging, material boundaries.
+- [ ] Build BLAS per chunk from `MeshData`; chunk → TLAS instances.
+- [ ] MagicaVoxel `.vox` import → palette + chunks.
+- [ ] Jolt static collider per chunk.
 - **Deliverable:** walk a coarse-voxel level with per-material PBR.
 
 ## M3 — Skinned Mixamo NPCs
